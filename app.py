@@ -12,8 +12,13 @@ st.set_page_config(
     layout="wide",
 )
 
-# Genel sabit dosyalar
+# Dosya yolları
+dosya_adi = "okul_ders_programi.xlsx"
 kullanici_dosyasi = "kullanicilar.json"
+nobet_dosyasi = "nobet_listesi.csv"
+gecmis_dosyasi = "assignment_history.csv"
+gelmeyen_dosyasi = "gelmeyen_ogretmenler.csv"
+muafiyet_dosyasi = "nobet_muafiyetleri.json"
 geri_bildirim_dosyasi = "geri_bildirimler.csv"
 
 
@@ -23,6 +28,23 @@ def tr_normalize(text):
     return str(text).strip().replace("İ", "i").replace("I", "ı").replace("Ş", "ş").replace("Ğ", "ğ").replace("Ü",
                                                                                                              "ü").replace(
         "Ö", "ö").replace("Ç", "ç").lower()
+
+
+def gecmisi_kaydet(df):
+    if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
+        df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(drop=True)
+    df.to_csv(gecmis_dosyasi, index=False)
+
+
+def gecmisi_yukle():
+    if os.path.exists(gecmis_dosyasi):
+        df = pd.read_csv(gecmis_dosyasi)
+        if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
+            df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(
+                drop=True)
+        return df
+    return pd.DataFrame(
+        columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen", "Branş"])
 
 
 def kullanicilari_kaydet(users_dict):
@@ -53,6 +75,41 @@ def kullanicilari_yukle():
     return varsayilan
 
 
+def muafiyetleri_yukle():
+    if os.path.exists(muafiyet_dosyasi):
+        with open(muafiyet_dosyasi, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except:
+                return {}
+    return {}
+
+
+def muafiyetleri_kaydet(muaf_dict):
+    with open(muafiyet_dosyasi, "w", encoding="utf-8") as f: json.dump(muaf_dict, f, ensure_ascii=False, indent=4)
+
+
+def nobetleri_yukle():
+    if os.path.exists(nobet_dosyasi): return pd.read_csv(nobet_dosyasi)
+    return pd.DataFrame(columns=["Gün", "Nöbet Yeri", "Öğretmen Adı"])
+
+
+def nobetleri_kaydet(df): df.to_csv(nobet_dosyasi, index=False)
+
+
+def gelmeyenleri_yukle():
+    if os.path.exists(gelmeyen_dosyasi):
+        df = pd.read_csv(gelmeyen_dosyasi)
+        if "Gelmeyen Saatler" not in df.columns: df["Gelmeyen Saatler"] = "1,2,3,4,5,6,7,8"
+        if "Mazeret" not in df.columns: df["Mazeret"] = "İzinli"
+        if "Onaylandi" not in df.columns: df["Onaylandi"] = False
+        return df
+    return pd.DataFrame(columns=["Tarih", "Gün", "Öğretmen Adı", "Gelmeyen Saatler", "Mazeret", "Onaylandi"])
+
+
+def gelmeyenleri_kaydet(df): df.to_csv(gelmeyen_dosyasi, index=False)
+
+
 def geri_bildirimleri_yukle():
     if os.path.exists(geri_bildirim_dosyasi):
         return pd.read_csv(geri_bildirim_dosyasi)
@@ -63,26 +120,17 @@ def geri_bildirimleri_kaydet(df):
     df.to_csv(geri_bildirim_dosyasi, index=False)
 
 
-# --- KULLANICIYA ÖZEL DOSYA YOLU ÜRETİCİLERİ ---
-def get_user_files(username):
-    prefix = f"{username}_"
-    return {
-        "ders": prefix + "okul_ders_programi.xlsx",
-        "nobet": prefix + "nobet_listesi.csv",
-        "gecmis": prefix + "assignment_history.csv",
-        "gelmeyen": prefix + "gelmeyen_ogretmenler.csv",
-        "muafiyet": prefix + "nobet_muafiyetleri.json"
-    }
-
-
-def sablon_olustur(dosya_adi):
+def sablon_olustur():
     if not os.path.exists(dosya_adi):
         gunler = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"]
         sutunlar = ["Sıra No", "Öğretmen Adı Soyadı", "Branş", "Toplam Ders Saati"]
         for gun in gunler:
             for saat in range(1, 9): sutunlar.append(f"{gun} {saat}. Saat")
-        df_sablon = pd.DataFrame([[1, "Öğretmen Örneği", "Branş Örneği", 0] + [""] * 40], columns=sutunlar)
+        df_sablon = pd.DataFrame([[1, "Ahmet Yılmaz", "Matematik", 0] + [""] * 40], columns=sutunlar)
         df_sablon.to_excel(dosya_adi, index=False)
+
+
+sablon_olustur()
 
 
 @st.cache_data
@@ -104,60 +152,8 @@ def dosya_okuma_yoneticisi(dosya_yolu):
     if os.path.exists(dosya_yolu):
         return excel_oku_guvenli(dosya_yolu, os.path.getmtime(dosya_yolu))
     else:
-        sablon_olustur(dosya_yolu)
+        sablon_olustur()
         return excel_oku_guvenli(dosya_yolu, os.path.getmtime(dosya_yolu))
-
-
-def gecmisi_kaydet(dosya_yolu, df):
-    if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
-        df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(drop=True)
-    df.to_csv(dosya_yolu, index=False)
-
-
-def gecmisi_yukle(dosya_yolu):
-    if os.path.exists(dosya_yolu):
-        df = pd.read_csv(dosya_yolu)
-        if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
-            df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(
-                drop=True)
-        return df
-    return pd.DataFrame(
-        columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen", "Branş"])
-
-
-def muafiyetleri_yukle(dosya_yolu):
-    if os.path.exists(dosya_yolu):
-        with open(dosya_yolu, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except:
-                return {}
-    return {}
-
-
-def muafiyetleri_kaydet(dosya_yolu, muaf_dict):
-    with open(dosya_yolu, "w", encoding="utf-8") as f: json.dump(muaf_dict, f, ensure_ascii=False, indent=4)
-
-
-def nobetleri_yukle(dosya_yolu):
-    if os.path.exists(dosya_yolu): return pd.read_csv(dosya_yolu)
-    return pd.DataFrame(columns=["Gün", "Nöbet Yeri", "Öğretmen Adı"])
-
-
-def nobetleri_kaydet(dosya_yolu, df): df.to_csv(dosya_yolu, index=False)
-
-
-def gelmeyenleri_yukle(dosya_yolu):
-    if os.path.exists(dosya_yolu):
-        df = pd.read_csv(dosya_yolu)
-        if "Gelmeyen Saatler" not in df.columns: df["Gelmeyen Saatler"] = "1,2,3,4,5,6,7,8"
-        if "Mazeret" not in df.columns: df["Mazeret"] = "İzinli"
-        if "Onaylandi" not in df.columns: df["Onaylandi"] = False
-        return df
-    return pd.DataFrame(columns=["Tarih", "Gün", "Öğretmen Adı", "Gelmeyen Saatler", "Mazeret", "Onaylandi"])
-
-
-def gelmeyenleri_kaydet(dosya_yolu, df): df.to_csv(dosya_yolu, index=False)
 
 
 def stil_uygula(val):
@@ -171,6 +167,10 @@ def stil_uygula(val):
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if "current_user" not in st.session_state: st.session_state.current_user = ""
 if "users" not in st.session_state: st.session_state.users = kullanicilari_yukle()
+if "nobet_listesi" not in st.session_state: st.session_state.nobet_listesi = nobetleri_yukle()
+if "assignment_history" not in st.session_state: st.session_state.assignment_history = gecmisi_yukle()
+if "gelmeyen_listesi" not in st.session_state: st.session_state.gelmeyen_listesi = gelmeyenleri_yukle()
+if "muafiyet_listesi" not in st.session_state: st.session_state.muafiyet_listesi = muafiyetleri_yukle()
 if "geri_bildirim_listesi" not in st.session_state: st.session_state.geri_bildirim_listesi = geri_bildirimleri_yukle()
 if "secilen_tarih" not in st.session_state: st.session_state.secilen_tarih = datetime.date.today()
 if "sifirlama_onayi" not in st.session_state: st.session_state.sifirlama_onayi = False
@@ -208,8 +208,6 @@ if not st.session_state.logged_in:
             if st.form_submit_button("Kayıt Ol"):
                 if not k_ad or not sifre:
                     st.error("Kullanıcı adı ve şifre zorunludur.")
-                elif k_ad in st.session_state.users:
-                    st.error("Bu kullanıcı adı zaten alınmış!")
                 elif sifre != sifre_tekrar:
                     st.error("Şifreler eşleşmiyor!")
                 else:
@@ -248,18 +246,10 @@ if not st.session_state.logged_in:
 
 aktif_kullanici = st.session_state.current_user
 user_data = st.session_state.users.get(aktif_kullanici, {})
-okul_bilgisi = user_data.get("okul_adi", "Okul Adı Girilmedi")
-mudur_bilgisi = user_data.get("mudur_adi", "Müdür Adı Girilmedi")
+okul_bilgisi = user_data.get("okul_adi", "Kürşat Tüzmen Ortaokulu")
+mudur_bilgisi = user_data.get("mudur_adi", "Erdinç Uçar")
 il_bilgisi = user_data.get("il", "Gaziantep")
 ilce_bilgisi = user_data.get("ilce", "Şahinbey")
-
-# Aktif kullanıcıya özel dosya yollarını bağlıyoruz
-u_files = get_user_files(aktif_kullanici)
-dosya_adi = u_files["ders"]
-nobet_dosyasi = u_files["nobet"]
-gecmis_dosyasi = u_files["gecmis"]
-gelmeyen_dosyasi = u_files["gelmeyen"]
-muafiyet_dosyasi = u_files["muafiyet"]
 
 st.sidebar.success(f"Hoş geldiniz, {aktif_kullanici}!\n🏢 {okul_bilgisi}")
 if st.sidebar.button("Çıkış Yap"):
@@ -268,12 +258,6 @@ if st.sidebar.button("Çıkış Yap"):
     st.rerun()
 
 st.title(f"🏫 {okul_bilgisi} | Nöbetçim")
-
-# --- KULLANICIYA ÖZEL SESSION STATE YÜKLEMELERİ ---
-st.session_state.nobet_listesi = nobetleri_yukle(nobet_dosyasi)
-st.session_state.assignment_history = gecmisi_yukle(gecmis_dosyasi)
-st.session_state.gelmeyen_listesi = gelmeyenleri_yukle(gelmeyen_dosyasi)
-st.session_state.muafiyet_listesi = muafiyetleri_yukle(muafiyet_dosyasi)
 
 # --- SEKMELER (MENÜLER) ---
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
@@ -477,7 +461,7 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
     else:
         st.session_state.assignment_history = diger_gunler_hist
 
-    gecmisi_kaydet(gecmis_dosyasi, st.session_state.assignment_history)
+    gecmisi_kaydet(st.session_state.assignment_history)
 
 
 # --- 1. SEKME: GÖREVLENDİRME VE CANLI ÖNİZLEME ---
@@ -538,7 +522,7 @@ with tab1:
                              "Gelmeyen Saatler": [saatler_str], "Mazeret": [secilen_mazeret], "Onaylandi": [False]})
                         mevcut = pd.concat([mevcut, yeni], ignore_index=True)
                         st.session_state.gelmeyen_listesi = mevcut
-                        gelmeyenleri_kaydet(gelmeyen_dosyasi, mevcut)
+                        gelmeyenleri_kaydet(mevcut)
 
                         yeni_idx = mevcut.index[-1]
                         st.session_state[f"brans_cb_{yeni_idx}"] = form_brans_onceligi
@@ -610,18 +594,18 @@ with tab1:
                     with c_onay:
                         if not g_onayli and st.button("✅ Onayla", key=f"onay_{orig_idx}"):
                             st.session_state.gelmeyen_listesi.loc[orig_idx, "Onaylandi"] = True
-                            gelmeyenleri_kaydet(gelmeyen_dosyasi, st.session_state.gelmeyen_listesi)
+                            gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                             st.success("Onaylandı!")
                             st.rerun()
                         elif g_onayli and st.button("🔓 Onayı Kaldır", key=f"kaldir_{orig_idx}"):
                             st.session_state.gelmeyen_listesi.loc[orig_idx, "Onaylandi"] = False
-                            gelmeyenleri_kaydet(gelmeyen_dosyasi, st.session_state.gelmeyen_listesi)
+                            gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                             st.rerun()
                     with c_sil:
                         if st.button("🗑️ Sil", key=f"sil_{orig_idx}"):
                             st.session_state.gelmeyen_listesi = st.session_state.gelmeyen_listesi.drop(
                                 orig_idx).reset_index(drop=True)
-                            gelmeyenleri_kaydet(gelmeyen_dosyasi, st.session_state.gelmeyen_listesi)
+                            gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                             otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
                             st.success("Kayıt silindi.")
                             st.rerun()
@@ -655,7 +639,7 @@ with tab1:
         if not ogun_gelmeyenler_df.empty and not ogun_gelmeyenler_df["Onaylandi"].all():
             if st.button("✅ Tüm Görevlendirmeleri Toplu Olarak Onayla"):
                 st.session_state.gelmeyen_listesi.loc[ogun_gelmeyenler_df.index, "Onaylandi"] = True
-                gelmeyenleri_kaydet(gelmeyen_dosyasi, st.session_state.gelmeyen_listesi)
+                gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                 st.success("Tüm görevlendirmeler onaylandı!")
                 st.rerun()
 
@@ -711,7 +695,7 @@ with tab2:
 
                     st.session_state.muafiyet_listesi[ogr_adi]["nobet_tutmuyor"] = not yeni_durum
 
-                muafiyetleri_kaydet(muafiyet_dosyasi, st.session_state.muafiyet_listesi)
+                muafiyetleri_kaydet(st.session_state.muafiyet_listesi)
                 st.success("✅ Tüm öğretmenlerin nöbet muafiyet durumları başarıyla güncellendi ve kaydedildi!")
                 st.rerun()
     else:
@@ -746,7 +730,7 @@ with tab3:
                     yeni_n = pd.DataFrame(
                         {"Gün": [n_gun], "Nöbet Yeri": [nobet_yeri], "Öğretmen Adı": [eklenecek_nobetci]})
                     st.session_state.nobet_listesi = pd.concat([mevcut_nobetciler, yeni_n], ignore_index=True)
-                    nobetleri_kaydet(nobet_dosyasi, st.session_state.nobet_listesi)
+                    nobetleri_kaydet(st.session_state.nobet_listesi)
                     st.success("Nöbetçi başarıyla eklendi!")
                     st.rerun()
 
@@ -771,7 +755,7 @@ with tab3:
                         st.dataframe(pd.DataFrame(onizleme_veri), use_container_width=True, hide_index=True)
                     if st.button("🗑️ Nöbeti Sil", key=f"sil_nobet_{idx}"):
                         st.session_state.nobet_listesi = st.session_state.nobet_listesi.drop(idx).reset_index(drop=True)
-                        nobetleri_kaydet(nobet_dosyasi, st.session_state.nobet_listesi)
+                        nobetleri_kaydet(st.session_state.nobet_listesi)
                         st.success("Nöbet silindi.")
                         st.rerun()
         else:
@@ -820,7 +804,7 @@ with tab4:
                     st.session_state.assignment_history = pd.DataFrame(
                         columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen",
                                  "Branş"])
-                    gecmisi_kaydet(gecmis_dosyasi, st.session_state.assignment_history)
+                    gecmisi_kaydet(st.session_state.assignment_history)
                     st.session_state.sifirlama_onayi = False
                     st.success("Tüm görevlendirme geçmişi başarıyla sıfırlandı!")
                     st.rerun()
@@ -954,13 +938,13 @@ with tab7:
 with tab8:
     st.subheader("💬 Geri Bildirim, Hata ve Veri Düzeltme Talebi")
     st.write(
-        "Sistemde karşılaştığınız hataları, eksik verileri veya eklenmesini istediğiniz özellikleri doğrudan bize iletebilirsiniz.")
+        "Sistemde karşılaştığınız hataları, eksik verileri veya eklenmesini istediğiniz özellikleri doğrudan iletebilirsiniz.")
 
     with st.form("geri_bildirim_form"):
         konu_secimi = st.selectbox("Bildirim Konusu", ["Ders Programı / Veri Hatası", "Nöbet Dağıtım Hatası / İsteği",
                                                        "Arayüz / Tasarım Önerisi", "Diğer"])
         mesaj_detayi = st.text_area("Hata Açıklaması veya Eklenmesini / Düzeltilmesini İstediğiniz Veriler",
-                                    placeholder="Örn: Canan Kaya'nın Çarşamba günü 3. ve 4. saati boş görünmesine rağmen atama yapılırken hata oluştu. Düzeltilmesini rica ederim.")
+                                    placeholder="Örn: Ahmet Yılmaz'ın Çarşamba günü 3. ve 4. saati boş görünmesine rağmen atama yapılırken hata oluştu. Düzeltilmesini rica ederim.")
 
         if st.form_submit_button("🚀 Geri Bildirimi Gönder", type="primary"):
             if not mesaj_detayi.strip():
@@ -976,19 +960,20 @@ with tab8:
 
                 st.session_state.geri_bildirim_listesi = pd.concat(
                     [st.session_state.geri_bildirim_listesi, yeni_bildirim], ignore_index=True)
-                geri_bildirim_listeleri = st.session_state.geri_bildirim_listesi
-                geri_bildirimleri_kaydet(geri_bildirim_listeleri)
+                geri_bildirimleri_kaydet(st.session_state.geri_bildirim_listesi)
 
                 st.success("🎉 Geri bildiriminiz başarıyla iletildi! İlginiz için teşekkür ederiz.")
                 st.rerun()
 
-    st.markdown("---")
-    st.markdown("#### 📥 İletilen Tüm Geri Bildirimler ve Talepler")
-    if not st.session_state.geri_bildirim_listesi.empty:
-        st.dataframe(st.session_state.geri_bildirim_listesi, use_container_width=True, hide_index=True)
+    # Sadece ana yönetici (ediperdinc) tüm geri bildirim listesini ve raporu görebilir!
+    if aktif_kullanici == "ediperdinc":
+        st.markdown("---")
+        st.markdown("#### 📥 Yönetici Paneli: İletilen Tüm Geri Bildirimler ve Talepler")
+        if not st.session_state.geri_bildirim_listesi.empty:
+            st.dataframe(st.session_state.geri_bildirim_listesi, use_container_width=True, hide_index=True)
 
-        with open(geri_bildirim_dosyasi, "rb") as f:
-            st.download_button("📥 Geri Bildirim Raporunu İndir (CSV)", data=f, file_name="geri_bildirimler.csv",
-                               mime="text/csv")
-    else:
-        st.info("Henüz iletilen bir geri bildirim bulunmuyor.")
+            with open(geri_bildirim_dosyasi, "rb") as f:
+                st.download_button("📥 Geri Bildirim Raporunu İndir (CSV)", data=f, file_name="geri_bildirimler.csv",
+                                   mime="text/csv")
+        else:
+            st.info("Henüz iletilen bir geri bildirim bulunmuyor.")
