@@ -12,14 +12,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# Dosya yolları
-dosya_adi = "okul_ders_programi.xlsx"
 kullanici_dosyasi = "kullanicilar.json"
-nobet_dosyasi = "nobet_listesi.csv"
-gecmis_dosyasi = "assignment_history.csv"
-gelmeyen_dosyasi = "gelmeyen_ogretmenler.csv"
-muafiyet_dosyasi = "nobet_muafiyetleri.json"
-geri_bildirim_dosyasi = "geri_bildirimler.csv"
 
 
 # --- YARDIMCI FONKSİYONLAR ---
@@ -28,23 +21,6 @@ def tr_normalize(text):
     return str(text).strip().replace("İ", "i").replace("I", "ı").replace("Ş", "ş").replace("Ğ", "ğ").replace("Ü",
                                                                                                              "ü").replace(
         "Ö", "ö").replace("Ç", "ç").lower()
-
-
-def gecmisi_kaydet(df):
-    if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
-        df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(drop=True)
-    df.to_csv(gecmis_dosyasi, index=False)
-
-
-def gecmisi_yukle():
-    if os.path.exists(gecmis_dosyasi):
-        df = pd.read_csv(gecmis_dosyasi)
-        if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
-            df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(
-                drop=True)
-        return df
-    return pd.DataFrame(
-        columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen", "Branş"])
 
 
 def kullanicilari_kaydet(users_dict):
@@ -73,6 +49,115 @@ def kullanicilari_yukle():
             pass
     kullanicilari_kaydet(varsayilan)
     return varsayilan
+
+
+# --- SESSION STATE ---
+if "logged_in" not in st.session_state: st.session_state.logged_in = False
+if "current_user" not in st.session_state: st.session_state.current_user = ""
+if "users" not in st.session_state: st.session_state.users = kullanicilari_yukle()
+
+gunler_tr = {"Monday": "Pazartesi", "Tuesday": "Salı", "Wednesday": "Çarşamba", "Thursday": "Perşembe",
+             "Friday": "Cuma", "Saturday": "Cumartesi", "Sunday": "Pazar"}
+
+# --- 1. SOL MENÜ: GİRİŞ VE KAYIT YÖNETİMİ ---
+st.sidebar.title("🔐 İdareci Paneli")
+giris_tab = st.sidebar.radio("İşlem Seçin", ["Giriş Yap", "Kayıt Ol", "Şifremi Unuttum"])
+
+if not st.session_state.logged_in:
+    if giris_tab == "Giriş Yap":
+        k_adi = st.sidebar.text_input("Kullanıcı Adı")
+        sifre = st.sidebar.text_input("Şifre", type="password")
+        if st.sidebar.button("Giriş Yap", type="primary"):
+            if k_adi in st.session_state.users and st.session_state.users[k_adi].get("password") == sifre:
+                st.session_state.logged_in = True
+                st.session_state.current_user = k_adi
+                st.rerun()
+            else:
+                st.sidebar.error("Hatalı kullanıcı adı veya şifre!")
+
+    elif giris_tab == "Kayıt Ol":
+        with st.sidebar.form("kayit_form"):
+            k_ad = st.text_input("Kullanıcı Adı")
+            okul = st.text_input("Kurum / Okul İsmi")
+            kod = st.text_input("Kurum Kodu (6 haneli MEBBİS kodu)", max_chars=6)
+            mudur = st.text_input("Müdür Adı Soyadı (İsteğe bağlı)")
+            mail = st.text_input("E-posta")
+            tel = st.text_input("Telefon")
+            sifre = st.text_input("Şifre", type="password")
+            sifre_tekrar = st.text_input("Şifre Tekrar", type="password")
+
+            if st.form_submit_button("Kayıt Ol"):
+                if not k_ad or not sifre:
+                    st.error("Kullanıcı adı ve şifre zorunludur.")
+                elif sifre != sifre_tekrar:
+                    st.error("Şifreler eşleşmiyor!")
+                elif k_ad in st.session_state.users:
+                    st.error("Bu kullanıcı adı zaten alınmış!")
+                else:
+                    st.session_state.users[k_ad] = {
+                        "password": sifre, "eposta": mail, "telefon": tel,
+                        "okul_adi": okul, "kurum_kodu": kod, "mudur_adi": mudur,
+                        "il": "Gaziantep", "ilce": "Şahinbey"
+                    }
+                    kullanicilari_kaydet(st.session_state.users)
+                    st.success("Kayıt başarılı! Lütfen sol menüden giriş yapın.")
+
+    elif giris_tab == "Şifremi Unuttum":
+        s_girdi = st.sidebar.text_input("Kullanıcı Adı, E-posta veya Telefon Numarası")
+        yeni_sifre = st.sidebar.text_input("Yeni Şifre", type="password")
+        yeni_sifre_tekrar = st.sidebar.text_input("Yeni Şifre Tekrar", type="password")
+        if st.sidebar.button("Şifreyi Yenile"):
+            bulundu = False
+            for k, info in st.session_state.users.items():
+                if k == s_girdi or info.get("eposta") == s_girdi or info.get("telefon") == s_girdi:
+                    if yeni_sifre and yeni_sifre == yeni_sifre_tekrar:
+                        st.session_state.users[k]["password"] = yeni_sifre
+                        kullanicilari_kaydet(st.session_state.users)
+                        st.success("Şifreniz başarıyla yenilendi! Giriş yapabilirsiniz.")
+                        bulundu = True
+                        break
+                    else:
+                        st.error("Şifreler uyuşmuyor veya boş.")
+                        bulundu = True
+                        break
+            if not bulundu:
+                st.error("Girilen bilgilere ait kayıt bulunamadı.")
+
+    st.title("🏫 Nöbetçim - Okul Yönetim Sistemi")
+    st.warning("⚠️ Lütfen sol taraftan giriş yapın.")
+    st.stop()
+
+aktif_kullanici = st.session_state.current_user
+user_data = st.session_state.users.get(aktif_kullanici, {})
+okul_bilgisi = user_data.get("okul_adi", "Kürşat Tüzmen Ortaokulu")
+mudur_bilgisi = user_data.get("mudur_adi", "Erdinç Uçar")
+il_bilgisi = user_data.get("il", "Gaziantep")
+ilce_bilgisi = user_data.get("ilce", "Şahinbey")
+
+# --- KULLANICIYA ÖZEL DOSYA YOLLARI ---
+dosya_adi = f"{aktif_kullanici}_okul_ders_programi.xlsx"
+nobet_dosyasi = f"{aktif_kullanici}_nobet_listesi.csv"
+gecmis_dosyasi = f"{aktif_kullanici}_assignment_history.csv"
+gelmeyen_dosyasi = f"{aktif_kullanici}_gelmeyen_ogretmenler.csv"
+muafiyet_dosyasi = f"{aktif_kullanici}_nobet_muafiyetleri.json"
+geri_bildirim_dosyasi = "geri_bildirimler.csv"  # Geri bildirimler ortak havuzda kalabilir (yönetici görsün diye)
+
+
+def gecmisi_kaydet(df):
+    if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
+        df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(drop=True)
+    df.to_csv(gecmis_dosyasi, index=False)
+
+
+def gecmisi_yukle():
+    if os.path.exists(gecmis_dosyasi):
+        df = pd.read_csv(gecmis_dosyasi)
+        if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
+            df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(
+                drop=True)
+        return df
+    return pd.DataFrame(
+        columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen", "Branş"])
 
 
 def muafiyetleri_yukle():
@@ -163,93 +248,14 @@ def stil_uygula(val):
     return "background-color: #d1e7dd; color: #0f5132"
 
 
-# --- SESSION STATE ---
-if "logged_in" not in st.session_state: st.session_state.logged_in = False
-if "current_user" not in st.session_state: st.session_state.current_user = ""
-if "users" not in st.session_state: st.session_state.users = kullanicilari_yukle()
-if "nobet_listesi" not in st.session_state: st.session_state.nobet_listesi = nobetleri_yukle()
-if "assignment_history" not in st.session_state: st.session_state.assignment_history = gecmisi_yukle()
-if "gelmeyen_listesi" not in st.session_state: st.session_state.gelmeyen_listesi = gelmeyenleri_yukle()
-if "muafiyet_listesi" not in st.session_state: st.session_state.muafiyet_listesi = muafiyetleri_yukle()
+# Session State yüklemeleri (Kullanıcıya özel)
+st.session_state.nobet_listesi = nobetleri_yukle()
+st.session_state.assignment_history = gecmisi_yukle()
+st.session_state.gelmeyen_listesi = gelmeyenleri_yukle()
+st.session_state.muafiyet_listesi = muafiyetleri_yukle()
 if "geri_bildirim_listesi" not in st.session_state: st.session_state.geri_bildirim_listesi = geri_bildirimleri_yukle()
 if "secilen_tarih" not in st.session_state: st.session_state.secilen_tarih = datetime.date.today()
 if "sifirlama_onayi" not in st.session_state: st.session_state.sifirlama_onayi = False
-
-gunler_tr = {"Monday": "Pazartesi", "Tuesday": "Salı", "Wednesday": "Çarşamba", "Thursday": "Perşembe",
-             "Friday": "Cuma", "Saturday": "Cumartesi", "Sunday": "Pazar"}
-
-# --- 1. SOL MENÜ: GİRİŞ VE KAYIT YÖNETİMİ ---
-st.sidebar.title("🔐 İdareci Paneli")
-giris_tab = st.sidebar.radio("İşlem Seçin", ["Giriş Yap", "Kayıt Ol", "Şifremi Unuttum"])
-
-if not st.session_state.logged_in:
-    if giris_tab == "Giriş Yap":
-        k_adi = st.sidebar.text_input("Kullanıcı Adı")
-        sifre = st.sidebar.text_input("Şifre", type="password")
-        if st.sidebar.button("Giriş Yap", type="primary"):
-            if k_adi in st.session_state.users and st.session_state.users[k_adi].get("password") == sifre:
-                st.session_state.logged_in = True
-                st.session_state.current_user = k_adi
-                st.rerun()
-            else:
-                st.sidebar.error("Hatalı kullanıcı adı veya şifre!")
-
-    elif giris_tab == "Kayıt Ol":
-        with st.sidebar.form("kayit_form"):
-            k_ad = st.text_input("Kullanıcı Adı")
-            okul = st.text_input("Kurum / Okul İsmi")
-            kod = st.text_input("Kurum Kodu (6 haneli MEBBİS kodu)", max_chars=6)
-            mudur = st.text_input("Müdür Adı Soyadı (İsteğe bağlı)")
-            mail = st.text_input("E-posta")
-            tel = st.text_input("Telefon")
-            sifre = st.text_input("Şifre", type="password")
-            sifre_tekrar = st.text_input("Şifre Tekrar", type="password")
-
-            if st.form_submit_button("Kayıt Ol"):
-                if not k_ad or not sifre:
-                    st.error("Kullanıcı adı ve şifre zorunludur.")
-                elif sifre != sifre_tekrar:
-                    st.error("Şifreler eşleşmiyor!")
-                else:
-                    st.session_state.users[k_ad] = {
-                        "password": sifre, "eposta": mail, "telefon": tel,
-                        "okul_adi": okul, "kurum_kodu": kod, "mudur_adi": mudur,
-                        "il": "Gaziantep", "ilce": "Şahinbey"
-                    }
-                    kullanicilari_kaydet(st.session_state.users)
-                    st.success("Kayıt başarılı! Lütfen sol menüden giriş yapın.")
-
-    elif giris_tab == "Şifremi Unuttum":
-        s_girdi = st.sidebar.text_input("Kullanıcı Adı, E-posta veya Telefon Numarası")
-        yeni_sifre = st.sidebar.text_input("Yeni Şifre", type="password")
-        yeni_sifre_tekrar = st.sidebar.text_input("Yeni Şifre Tekrar", type="password")
-        if st.sidebar.button("Şifreyi Yenile"):
-            bulundu = False
-            for k, info in st.session_state.users.items():
-                if k == s_girdi or info.get("eposta") == s_girdi or info.get("telefon") == s_girdi:
-                    if yeni_sifre and yeni_sifre == yeni_sifre_tekrar:
-                        st.session_state.users[k]["password"] = yeni_sifre
-                        kullanicilari_kaydet(st.session_state.users)
-                        st.success("Şifreniz başarıyla yenilendi! Giriş yapabilirsiniz.")
-                        bulundu = True
-                        break
-                    else:
-                        st.error("Şifreler uyuşmuyor veya boş.")
-                        bulundu = True
-                        break
-            if not bulundu:
-                st.error("Girilen bilgilere ait kayıt bulunamadı.")
-
-    st.title("🏫 Nöbetçim - Okul Yönetim Sistemi")
-    st.warning("⚠️ Lütfen sol taraftan giriş yapın.")
-    st.stop()
-
-aktif_kullanici = st.session_state.current_user
-user_data = st.session_state.users.get(aktif_kullanici, {})
-okul_bilgisi = user_data.get("okul_adi", "Kürşat Tüzmen Ortaokulu")
-mudur_bilgisi = user_data.get("mudur_adi", "Erdinç Uçar")
-il_bilgisi = user_data.get("il", "Gaziantep")
-ilce_bilgisi = user_data.get("ilce", "Şahinbey")
 
 st.sidebar.success(f"Hoş geldiniz, {aktif_kullanici}!\n🏢 {okul_bilgisi}")
 if st.sidebar.button("Çıkış Yap"):
