@@ -140,7 +140,7 @@ nobet_dosyasi = f"{aktif_kullanici}_nobet_listesi.csv"
 gecmis_dosyasi = f"{aktif_kullanici}_assignment_history.csv"
 gelmeyen_dosyasi = f"{aktif_kullanici}_gelmeyen_ogretmenler.csv"
 muafiyet_dosyasi = f"{aktif_kullanici}_nobet_muafiyetleri.json"
-geri_bildirim_dosyasi = "geri_bildirimler.csv"  # Geri bildirimler ortak havuzda kalabilir (yönetici görsün diye)
+geri_bildirim_dosyasi = "geri_bildirimler.csv"
 
 
 def gecmisi_kaydet(df):
@@ -248,7 +248,7 @@ def stil_uygula(val):
     return "background-color: #d1e7dd; color: #0f5132"
 
 
-# Session State yüklemeleri (Kullanıcıya özel)
+# Session State yüklemeleri
 st.session_state.nobet_listesi = nobetleri_yukle()
 st.session_state.assignment_history = gecmisi_yukle()
 st.session_state.gelmeyen_listesi = gelmeyenleri_yukle()
@@ -264,6 +264,20 @@ if st.sidebar.button("Çıkış Yap"):
     st.rerun()
 
 st.title(f"🏫 {okul_bilgisi} | Nöbetçim")
+
+# --- KARŞILAMA VE SİSTEM YETENEKLERİ BİLGİSİ ---
+with st.container():
+    st.info("""
+    👋 **Nöbetçim Yönetim Paneline Hoş Geldiniz!**  
+    Bu sistem okullardaki nöbet ve ders görevlendirme süreçlerini dijitalleştirmek için tasarlanmıştır. Bu sürümde yapabileceğiniz temel işlemler şunlardır:
+
+    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programı Excel dosyasını yükleyerek tüm öğretmenlerin programını dijital ortamda görüntüleme.
+    * **⚡ Otomatik Acil Görevlendirme:** Günlük olarak gelmeyen/izinli öğretmenlerin ders saatlerine, nöbetçi öğretmenler arasından en adil ve otomatik şekilde görevlendirme yapma.
+    * **📅 Günlük Nöbetçi Listesi:** Hangi gün kimin hangi katta/yerde nöbetçi olduğunu belirleme ve bu listeyi günlük olarak tek tıkla çıktı alma.
+    * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alma.
+    * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip etme.
+    * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlama.
+    """)
 
 # --- SEKMELER (MENÜLER) ---
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
@@ -980,6 +994,6 @@ with tab8:
 
             with open(geri_bildirim_dosyasi, "rb") as f:
                 st.download_button("📥 Geri Bildirim Raporunu İndir (CSV)", data=f, file_name="geri_bildirimler.csv",
-                                   mime="text/csv")
+                                   mime="text/html")
         else:
             st.info("Henüz iletilen bir geri bildirim bulunmuyor.")
