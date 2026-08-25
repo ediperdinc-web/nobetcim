@@ -123,8 +123,22 @@ if not st.session_state.logged_in:
             if not bulundu:
                 st.error("Girilen bilgilere ait kayıt bulunamadı.")
 
-    st.title("🏫 Nöbetçim - Okul Yönetim Sistemi")
-    st.warning("⚠️ Lütfen sol taraftan giriş yapın.")
+    # --- GİRİŞ YAPILMAMIŞSA GÖSTERİLECEK TANITIM EKRANI ---
+    st.title("🏫 Nöbetçim - Okul Nöbet ve Görevlendirme Sistemi")
+    st.warning("⚠️ Lütfen sol taraftan giriş yapın veya yeni hesap oluşturun.")
+
+    st.markdown("---")
+    st.markdown("### 🚀 Nöbetçim Sistemi ile Neler Yapabilirsiniz?")
+    st.info("""
+    Bu sistem okullardaki nöbet ve ders görevlendirme süreçlerini tamamen dijitalleştirmek ve hızlandırmak için tasarlanmıştır. **Sol taraftaki menüyü kullanarak giriş yapabilir veya hemen ücretsiz kayıt olabilirsiniz.**
+
+    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programı Excel dosyasını yükleyerek tüm öğretmenlerin programını dijital ortamda görüntüleme.
+    * **⚡ Otomatik Acil Görevlendirme:** Günlük olarak gelmeyen/izinli öğretmenlerin ders saatlerine, nöbetçi öğretmenler arasından en adil ve otomatik şekilde görevlendirme yapma.
+    * **📅 Günlük Nöbetçi Listesi:** Hangi gün kimin hangi katta/yerde nöbetçi olduğunu belirleme ve bu listeyi günlük olarak tek tıkla çıktı alma.
+    * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alma.
+    * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip etme.
+    * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlama.
+    """)
     st.stop()
 
 aktif_kullanici = st.session_state.current_user
@@ -264,20 +278,6 @@ if st.sidebar.button("Çıkış Yap"):
     st.rerun()
 
 st.title(f"🏫 {okul_bilgisi} | Nöbetçim")
-
-# --- KARŞILAMA VE SİSTEM YETENEKLERİ BİLGİSİ ---
-with st.container():
-    st.info("""
-    👋 **Nöbetçim Yönetim Paneline Hoş Geldiniz!**  
-    Bu sistem okullardaki nöbet ve ders görevlendirme süreçlerini dijitalleştirmek için tasarlanmıştır. Bu sürümde yapabileceğiniz temel işlemler şunlardır:
-
-    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programı Excel dosyasını yükleyerek tüm öğretmenlerin programını dijital ortamda görüntüleme.
-    * **⚡ Otomatik Acil Görevlendirme:** Günlük olarak gelmeyen/izinli öğretmenlerin ders saatlerine, nöbetçi öğretmenler arasından en adil ve otomatik şekilde görevlendirme yapma.
-    * **📅 Günlük Nöbetçi Listesi:** Hangi gün kimin hangi katta/yerde nöbetçi olduğunu belirleme ve bu listeyi günlük olarak tek tıkla çıktı alma.
-    * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alma.
-    * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip etme.
-    * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlama.
-    """)
 
 # --- SEKMELER (MENÜLER) ---
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
