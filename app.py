@@ -215,10 +215,7 @@ def gelmeyenleri_kaydet(df): df.to_csv(gelmeyen_dosyasi, index=False)
 
 def geri_bildirimleri_yukle():
     if os.path.exists(geri_bildirim_dosyasi):
-        df = pd.read_csv(geri_bildirim_dosyasi)
-        if "Durum" not in df.columns:
-            df["Durum"] = "Beklemede"
-        return df
+        return pd.read_csv(geri_bildirim_dosyasi)
     return pd.DataFrame(columns=["Tarih", "Kullanıcı", "Konu", "Mesaj", "Durum"])
 
 
@@ -346,8 +343,7 @@ def ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_satir, secilen_gun):
                str(ogrt_satir[ders_sutunu_bul(df_ders, secilen_gun, s)].values[0]).strip() not in ["", "nan", "Boş"])
 
 
-def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_brans, oto_brans, sadece_nobetci=True,
-                           manuel_secim=False):
+def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_brans, oto_brans, sadece_nobetci=True):
     hedef_sutun = ders_sutunu_bul(df_ders, secilen_gun, saat)
     if hedef_sutun not in df_ders.columns: return []
     muaf_dict = st.session_state.muafiyet_listesi
@@ -404,10 +400,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        if not manuel_secim:
-            if sadece_nobetci and is_nobetci == 0:
-                continue
-
+        if is_nobetci == 0 and sadece_nobetci:
             toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
             if toplam_ders < 1: continue
 
@@ -421,7 +414,6 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
                 if saat <= 4 and ilk_ders_saati > 4: continue
                 if saat >= 6 and son_ders_saati < 6: continue
-                if saat > son_ders_saati + 1 and not (is_nobetci == 1): continue
 
         is_same_branch = 1 if (oto_brans and g_brans and brns and tr_normalize(brns) == tr_normalize(g_brans)) else 0
 
@@ -435,7 +427,13 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
     for lst in [musait_nobetciler, musait_digerleri]:
         lst.sort(key=lambda x: (-x["is_same_branch"], x["count"]))
 
-    return musait_nobetciler + musait_digerleri
+    if not sadece_nobetci:
+        return musait_nobetciler + musait_digerleri
+
+    if musait_nobetciler:
+        return musait_nobetciler
+    else:
+        return musait_digerleri
 
 
 def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
@@ -469,7 +467,7 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
         g_brans = str(gelen_row[brans_col].values[0]) if not gelen_row.empty and brans_col in gelen_row.columns else ""
 
         orig_idx = grow.name
-        disi_ver = st.session_state.get(f"disi_cb_{orig_idx}", False)
+        sadece_nobet = not st.session_state.get(f"disi_cb_{orig_idx}", False)
         oto_brans = st.session_state.get(f"brans_cb_{orig_idx}", True)
 
         for saat in g_saatler:
@@ -486,14 +484,14 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
                     atanan_kisi = str(eski_atama_satiri["Görevlendirilen Öğretmen"].values[0])
                     atanan_kisi_clean = tr_normalize(atanan_kisi)
 
-                    if not disi_ver and atanan_kisi_clean not in nobetci_isimleri_clean:
+                    if sadece_nobet and atanan_kisi_clean not in nobetci_isimleri_clean:
                         continue
 
                     yeni_atama_listesi.append(eski_atama_satiri.iloc[0].to_dict())
                     continue
 
                 musaitler = uygun_ogretmenleri_bul(df_ders, tarih, gun, saat, g_ogrt, g_brans, oto_brans,
-                                                   sadece_nobetci=(not disi_ver), manuel_secim=False)
+                                                   sadece_nobetci=sadece_nobet)
                 if musaitler:
                     atama = musaitler[0]
                     yeni_atama_listesi.append({
@@ -549,8 +547,6 @@ with tab1:
             secilen_gelmeyen_saatler = st.multiselect("Gelmeyen Ders Saatleri", options=list(range(1, 9)),
                                                       default=list(range(1, 9)))
             form_brans_onceligi = st.checkbox("🔍 Branş Önceliği Uygula", value=True, key="form_brans_cb")
-            form_disi_cb = st.checkbox("🌐 Nöbetçi Dışı Öğretmenler de Görevlendirilebilsin", value=False,
-                                       key="form_disi_cb")
 
             if st.form_submit_button("🚀 Kaydet ve Otomatik Görevlendir", type="primary"):
                 if secilen_anlik_ogretmen in ["Lütfen Öğretmen Seçin...", "Tüm Öğretmenler"]:
@@ -575,7 +571,6 @@ with tab1:
 
                         yeni_idx = mevcut.index[-1]
                         st.session_state[f"brans_cb_{yeni_idx}"] = form_brans_onceligi
-                        st.session_state[f"disi_cb_{yeni_idx}"] = form_disi_cb
 
                         otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
                         st.success("Başarıyla kaydedildi ve otomatik görevlendirildi!")
@@ -595,25 +590,6 @@ with tab1:
 
                 with st.expander(f"🔴 {g_ogrt} ({g_mazeret}) {'🔒 (Onaylandı)' if g_onayli else '🔓 (Beklemede)'}",
                                  expanded=True):
-
-                    c_ayar1, c_ayar2 = st.columns(2)
-                    with c_ayar1:
-                        mevcut_disi_val = st.session_state.get(f"disi_cb_{orig_idx}", False)
-                        yeni_disi_val = st.checkbox("Nöbetçi Dışı Ver", value=mevcut_disi_val,
-                                                    key=f"disi_cb_exp_{orig_idx}")
-                        if yeni_disi_val != mevcut_disi_val:
-                            st.session_state[f"disi_cb_{orig_idx}"] = yeni_disi_val
-                            otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
-                            st.rerun()
-                    with c_ayar2:
-                        mevcut_brans_val = st.session_state.get(f"brans_cb_{orig_idx}", True)
-                        yeni_brans_val = st.checkbox("Branş Önceliği", value=mevcut_brans_val,
-                                                     key=f"brans_cb_exp_{orig_idx}")
-                        if yeni_brans_val != mevcut_brans_val:
-                            st.session_state[f"brans_cb_{orig_idx}"] = yeni_brans_val
-                            otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
-                            st.rerun()
-
                     mevcut_gorevler = st.session_state.assignment_history[
                         (st.session_state.assignment_history["Tarih"].astype(str).str[:10] == str(t1_tarih)[:10]) &
                         (st.session_state.assignment_history["Gelmeyen Öğretmen"].apply(tr_normalize) == tr_normalize(
@@ -650,8 +626,7 @@ with tab1:
                             col_degis1, col_degis2 = st.columns([3, 1])
                             with col_degis1:
                                 musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat, g_ogrt,
-                                                                        "", False, sadece_nobetci=False,
-                                                                        manuel_secim=True)
+                                                                        "", False, sadece_nobetci=False)
 
                                 ilk_secenek_metni = "Görevlendirmeyi Değiştir" if not match_atama.empty else "Atama Yapılmadı / Seçim Yap"
 
@@ -670,8 +645,13 @@ with tab1:
                                 if secilen_manuel != ilk_secenek_metni:
                                     secilen_ogretmen_adi = aday_map[secilen_manuel]
                                     ogr_satir_secilen = ogretmen_satiri_bul(df_ders, secilen_ogretmen_adi, ogrt_col)
-                                    s_brans = str(ogr_satir_secilen[brans_col].values[
-                                                      0]) if not ogr_satir_secilen.empty and brans_col in ogrt_satir_secilen.columns else ""
+
+                                    # Güvenli branş tespiti
+                                    secilen_brans_sutun = next((c for c in ogr_satir_secilen.columns if any(
+                                        k in str(c).lower() for k in ["branş", "brans", "alan", "ders"])), None)
+                                    s_brans = str(ogr_satir_secilen[secilen_brans_sutun].values[
+                                                      0]) if not ogr_satir_secilen.empty and secilen_brans_sutun and not pd.isna(
+                                        ogr_satir_secilen[secilen_brans_sutun].values[0]) else ""
 
                                     hist = st.session_state.assignment_history
                                     tarih_str = str(t1_tarih)[:10]
@@ -1090,7 +1070,7 @@ with tab8:
         konu_secimi = st.selectbox("Bildirim Konusu", ["Ders Programı / Veri Hatası", "Nöbet Dağıtım Hatası / İsteği",
                                                        "Arayüz / Tasarım Önerisi", "Diğer"])
         mesaj_detayi = st.text_area("Hata Açıklaması veya Eklenmesini / Düzeltilmesini İstediğiniz Veriler",
-                                    placeholder="Örn: Ahmet Yılmaz'ın Çarşamba günü 3. ve 4. saati görünmesine rağmen atama yapılırken hata oluştu. Düzeltilmesini rica ederim.")
+                                    placeholder="Örn: Ahmet Yılmaz'ın Çarşamba günü 3. ve 4. saati boş görünmesine rağmen atama yapılırken hata oluştu. Düzeltilmesini rica ederim.")
 
         if st.form_submit_button("🚀 Geri Bildirimi Gönder", type="primary"):
             if not mesaj_detayi.strip():
@@ -1115,33 +1095,10 @@ with tab8:
         st.markdown("---")
         st.markdown("#### 📥 Yönetici Paneli: İletilen Tüm Geri Bildirimler ve Talepler")
         if not st.session_state.geri_bildirim_listesi.empty:
-            st.write(
-                "💡 Tablo üzerindeki **'Durum'** sütununu tıklayarak bildirimlerin durumunu (Beklemede, İnceleniyor, Çözüldü vb.) güncelleyebilir veya satırları silebilirsiniz.")
+            st.dataframe(st.session_state.geri_bildirim_listesi, use_container_width=True, hide_index=True)
 
-            edited_bildirimler = st.data_editor(
-                st.session_state.geri_bildirim_listesi,
-                column_config={
-                    "Durum": st.column_config.SelectboxColumn(
-                        "Durum",
-                        options=["Beklemede", "İnceleniyor", "Çözüldü", "Reddedildi"],
-                        required=True
-                    )
-                },
-                use_container_width=True,
-                num_rows="dynamic",
-                key="geri_bildirim_editor"
-            )
-
-            col_b1, col_b2 = st.columns([2, 1])
-            with col_b1:
-                if st.button("💾 Geri Bildirim Durumlarını ve Değişiklikleri Kaydet", type="primary"):
-                    st.session_state.geri_bildirim_listesi = edited_bildirimler
-                    geri_bildirimleri_kaydet(edited_bildirimler)
-                    st.success("✅ Geri bildirim durumları başarıyla güncellendi!")
-                    st.rerun()
-            with col_b2:
-                with open(geri_bildirim_dosyasi, "rb") as f:
-                    st.download_button("📥 Raporu İndir (CSV)", data=f, file_name="geri_bildirimler.csv",
-                                       mime="text/csv")
+            with open(geri_bildirim_dosyasi, "rb") as f:
+                st.download_button("📥 Geri Bildirim Raporunu İndir (CSV)", data=f, file_name="geri_bildirimler.csv",
+                                   mime="text/html")
         else:
             st.info("Henüz iletilen bir geri bildirim bulunmuyor.")
