@@ -400,16 +400,10 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        # --- OTOMATİK MOTOR İÇİN KURAL KONTROLÜ ---
-        # Eğer öğretmen nöbetçi değilse;
-        # 1. O gün dersi hiç yoksa -> Otomatik atanmasın
-        # 2. İlk 4 saati boşsa (saat 1, 2, 3, 4) -> Otomatik atanmasın
-        # 3. Son 3 saati boşsa (saat 6, 7, 8 vb.) -> Otomatik atanmasın
         if is_nobetci == 0:
             toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
-            if toplam_ders < 1: continue  # Dersi hiç yoksa geç
+            if toplam_ders < 1: continue
 
-            # Öğretmenin gün içindeki tüm dolu ders saatlerini bulalım
             dolu_saatler = [s for s in range(1, 9) if
                             str(ogrt_tum_satir[ders_sutunu_bul(df_ders, secilen_gun, s)].values[0]).strip() not in ["",
                                                                                                                     "nan",
@@ -418,9 +412,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
                 ilk_ders_saati = min(dolu_saatler)
                 son_ders_saati = max(dolu_saatler)
 
-                # İlk 4 saat kuralı (Örn: Öğretmenin ilk dersi 5. saatte başlıyorsa, 1-4 arası boştur)
                 if saat <= 4 and ilk_ders_saati > 4: continue
-                # Son 3 saat kuralı (Örn: Öğretmenin son dersi 5. saatte bitiyorsa, 6-8 arası boştur)
                 if saat >= 6 and son_ders_saati < 6: continue
 
         is_same_branch = 1 if (oto_brans and g_brans and brns and tr_normalize(brns) == tr_normalize(g_brans)) else 0
@@ -620,7 +612,7 @@ with tab1:
 
                         if not gelen_satir.empty and sut in gelen_satir.columns:
                             hucre_val = str(gelen_satir[sut].values[0]).strip()
-                            if hucre_val != "" and hucre_val.lower() != "boş" and huru_val != "nan":  # Düzeltildi
+                            if hucre_val != "" and hucre_val.lower() != "boş" and hucre_val != "nan":
                                 is_dersi_var = True
                                 ders_durumu_str = hucre_val
 
@@ -629,7 +621,6 @@ with tab1:
 
                         col_degis1, col_degis2 = st.columns([3, 1])
                         with col_degis1:
-                            # MANUEL SEÇİMDE TÜM MÜSAİTLER GÖSTERİLİR (KURALA TAKILMAZ)
                             musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat, g_ogrt, "",
                                                                     False, sadece_nobetci=False)
 
