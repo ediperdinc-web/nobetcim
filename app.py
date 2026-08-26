@@ -400,7 +400,6 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        # --- OTOMATİK MOTOR KURALI: NÖBETÇİ OLSUN VEYA OLMASIN GÜNLÜK DERS/SAAT DENGESİ KORUNUR ---
         if sadece_nobetci and is_nobetci == 0:
             continue
 
@@ -415,8 +414,13 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
             ilk_ders_saati = min(dolu_saatler)
             son_ders_saati = max(dolu_saatler)
 
+            # --- KESİN KONTROL: ÖĞRETMENİN O GÜN GERÇEKTE DERSİ OLMAYAN VEYA UZAK SAAT DİLİMLERİNE ATAMA YAPILMASINI ÖNLE ---
+            # Eğer öğretmen günün sadece bir yarısında (örneğin sabah) dersteyse, öğleden sonraki boşluklara otomatik atanamaz
             if saat <= 4 and ilk_ders_saati > 4: continue
             if saat >= 6 and son_ders_saati < 6: continue
+
+            # Eğer öğretmenin o günkü son dersi örneğin 5. saatte bitiyorsa ve 7-8. saatler boşsa, okulda olmadığı varsayılarak o saatlere otomatik görev verilmez
+            if saat > son_ders_saati + 1 and not (is_nobetci == 1): continue
 
         is_same_branch = 1 if (oto_brans and g_brans and brns and tr_normalize(brns) == tr_normalize(g_brans)) else 0
 
@@ -487,7 +491,6 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
                     yeni_atama_listesi.append(eski_atama_satiri.iloc[0].to_dict())
                     continue
 
-                # disi_ver True ise sadece_nobetci=False yapılır, böylece nöbetçi dışı öğretmenler de sisteme dahil olur ama kurallara uyar
                 musaitler = uygun_ogretmenleri_bul(df_ders, tarih, gun, saat, g_ogrt, g_brans, oto_brans,
                                                    sadece_nobetci=(not disi_ver))
                 if musaitler:
