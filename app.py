@@ -343,7 +343,8 @@ def ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_satir, secilen_gun):
                str(ogrt_satir[ders_sutunu_bul(df_ders, secilen_gun, s)].values[0]).strip() not in ["", "nan", "Boş"])
 
 
-def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_brans, oto_brans, sadece_nobetci=True):
+def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_brans, oto_brans, sadece_nobetci=True,
+                           manuel_secim=False):
     hedef_sutun = ders_sutunu_bul(df_ders, secilen_gun, saat)
     if hedef_sutun not in df_ders.columns: return []
     muaf_dict = st.session_state.muafiyet_listesi
@@ -400,27 +401,25 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        if sadece_nobetci and is_nobetci == 0:
-            continue
+        # Eğer manuel seçim için çağrılmadıysa (otomatik motor çalışıyorsa) katı kurallar uygulanır
+        if not manuel_secim:
+            if sadece_nobetci and is_nobetci == 0:
+                continue
 
-        toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
-        if toplam_ders < 1: continue
+            toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
+            if toplam_ders < 1: continue
 
-        dolu_saatler = [s for s in range(1, 9) if
-                        str(ogrt_tum_satir[ders_sutunu_bul(df_ders, secilen_gun, s)].values[0]).strip() not in ["",
-                                                                                                                "nan",
-                                                                                                                "Boş"]]
-        if dolu_saatler:
-            ilk_ders_saati = min(dolu_saatler)
-            son_ders_saati = max(dolu_saatler)
+            dolu_saatler = [s for s in range(1, 9) if
+                            str(ogrt_tum_satir[ders_sutunu_bul(df_ders, secilen_gun, s)].values[0]).strip() not in ["",
+                                                                                                                    "nan",
+                                                                                                                    "Boş"]]
+            if dolu_saatler:
+                ilk_ders_saati = min(dolu_saatler)
+                son_ders_saati = max(dolu_saatler)
 
-            # --- KESİN KONTROL: ÖĞRETMENİN O GÜN GERÇEKTE DERSİ OLMAYAN VEYA UZAK SAAT DİLİMLERİNE ATAMA YAPILMASINI ÖNLE ---
-            # Eğer öğretmen günün sadece bir yarısında (örneğin sabah) dersteyse, öğleden sonraki boşluklara otomatik atanamaz
-            if saat <= 4 and ilk_ders_saati > 4: continue
-            if saat >= 6 and son_ders_saati < 6: continue
-
-            # Eğer öğretmenin o günkü son dersi örneğin 5. saatte bitiyorsa ve 7-8. saatler boşsa, okulda olmadığı varsayılarak o saatlere otomatik görev verilmez
-            if saat > son_ders_saati + 1 and not (is_nobetci == 1): continue
+                if saat <= 4 and ilk_ders_saati > 4: continue
+                if saat >= 6 and son_ders_saati < 6: continue
+                if saat > son_ders_saati + 1 and not (is_nobetci == 1): continue
 
         is_same_branch = 1 if (oto_brans and g_brans and brns and tr_normalize(brns) == tr_normalize(g_brans)) else 0
 
@@ -433,6 +432,10 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
     for lst in [musait_nobetciler, musait_digerleri]:
         lst.sort(key=lambda x: (-x["is_same_branch"], x["count"]))
+
+    # Manuel seçimde nöbetçiler üstte, diğer dersi boş olan tüm öğretmenler arkasından listelenir
+    if manuel_secim:
+        return musait_nobetciler + musait_digerleri
 
     return musait_nobetciler + musait_digerleri
 
@@ -492,7 +495,7 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
                     continue
 
                 musaitler = uygun_ogretmenleri_bul(df_ders, tarih, gun, saat, g_ogrt, g_brans, oto_brans,
-                                                   sadece_nobetci=(not disi_ver))
+                                                   sadece_nobetci=(not disi_ver), manuel_secim=False)
                 if musaitler:
                     atama = musaitler[0]
                     yeni_atama_listesi.append({
@@ -648,8 +651,10 @@ with tab1:
 
                             col_degis1, col_degis2 = st.columns([3, 1])
                             with col_degis1:
+                                # Manuel seçimde öğretmenlerin listede eksiksiz görünmesi için manuel_secim=True verilir
                                 musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat, g_ogrt,
-                                                                        "", False, sadece_nobetci=False)
+                                                                        "", False, sadece_nobetci=False,
+                                                                        manuel_secim=True)
 
                                 ilk_secenek_metni = "Görevlendirmeyi Değiştir" if not match_atama.empty else "Atama Yapılmadı / Seçim Yap"
 
