@@ -616,7 +616,6 @@ with tab1:
                                 is_dersi_var = True
                                 ders_durumu_str = hucre_val
 
-                        # --- YENİ KURAL: EĞER DERSİ YOKSA (BOŞSA), GÖREVLENDİRME SEÇENEĞİ HİÇ ÇIKMASIN ---
                         if is_dersi_var:
                             st.markdown(
                                 f"**{saat}. Saat** | 🟢 Kendi Dersi (`{ders_durumu_str}`) | **Mevcut Atanan:** `{atanan_kisi}`")
@@ -626,7 +625,10 @@ with tab1:
                                 musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat, g_ogrt,
                                                                         "", False, sadece_nobetci=False)
 
-                                secenekler = ["Atama Yapılmadı / Değiştir"]
+                                # --- AKILLI İLK SEÇENEK BELİRLEME ---
+                                ilk_secenek_metni = "Görevlendirmeyi Değiştir" if not match_atama.empty else "Atama Yapılmadı / Seçim Yap"
+
+                                secenekler = [ilk_secenek_metni]
                                 aday_map = {}
                                 for aday in musait_adaylar:
                                     ogr_adi = aday["ogretmen"]
@@ -638,11 +640,11 @@ with tab1:
                                 secilen_manuel = st.selectbox(f"Manuel Değiştir ({saat}. Saat)", options=secenekler,
                                                               key=f"manuel_sec_{orig_idx}_{saat}")
 
-                                if secilen_manuel != "Atama Yapılmadı / Değiştir":
+                                if secilen_manuel != ilk_secenek_metni:
                                     secilen_ogretmen_adi = aday_map[secilen_manuel]
                                     ogr_satir_secilen = ogretmen_satiri_bul(df_ders, secilen_ogretmen_adi, ogrt_col)
                                     s_brans = str(ogr_satir_secilen[brans_col].values[
-                                                      0]) if not ogr_satir_secilen.empty and brans_col in ogr_satir_secilen.columns else ""
+                                                      0]) if not ogr_satir_secilen.empty and brans_col in ogrt_satir_secilen.columns else ""
 
                                     hist = st.session_state.assignment_history
                                     tarih_str = str(t1_tarih)[:10]
