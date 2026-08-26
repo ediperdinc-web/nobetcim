@@ -400,20 +400,23 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        if is_nobetci == 0 and sadece_nobetci:
-            toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
-            if toplam_ders < 1: continue
+        # --- OTOMATİK MOTOR KURALI: NÖBETÇİ OLSUN VEYA OLMASIN GÜNLÜK DERS/SAAT DENGESİ KORUNUR ---
+        if sadece_nobetci and is_nobetci == 0:
+            continue
 
-            dolu_saatler = [s for s in range(1, 9) if
-                            str(ogrt_tum_satir[ders_sutunu_bul(df_ders, secilen_gun, s)].values[0]).strip() not in ["",
-                                                                                                                    "nan",
-                                                                                                                    "Boş"]]
-            if dolu_saatler:
-                ilk_ders_saati = min(dolu_saatler)
-                son_ders_saati = max(dolu_saatler)
+        toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
+        if toplam_ders < 1: continue
 
-                if saat <= 4 and ilk_ders_saati > 4: continue
-                if saat >= 6 and son_ders_saati < 6: continue
+        dolu_saatler = [s for s in range(1, 9) if
+                        str(ogrt_tum_satir[ders_sutunu_bul(df_ders, secilen_gun, s)].values[0]).strip() not in ["",
+                                                                                                                "nan",
+                                                                                                                "Boş"]]
+        if dolu_saatler:
+            ilk_ders_saati = min(dolu_saatler)
+            son_ders_saati = max(dolu_saatler)
+
+            if saat <= 4 and ilk_ders_saati > 4: continue
+            if saat >= 6 and son_ders_saati < 6: continue
 
         is_same_branch = 1 if (oto_brans and g_brans and brns and tr_normalize(brns) == tr_normalize(g_brans)) else 0
 
@@ -461,7 +464,7 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
         g_brans = str(gelen_row[brans_col].values[0]) if not gelen_row.empty and brans_col in gelen_row.columns else ""
 
         orig_idx = grow.name
-        sadece_nobet = not st.session_state.get(f"disi_cb_{orig_idx}", False)
+        disi_ver = st.session_state.get(f"disi_cb_{orig_idx}", False)
         oto_brans = st.session_state.get(f"brans_cb_{orig_idx}", True)
 
         for saat in g_saatler:
@@ -478,14 +481,15 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
                     atanan_kisi = str(eski_atama_satiri["Görevlendirilen Öğretmen"].values[0])
                     atanan_kisi_clean = tr_normalize(atanan_kisi)
 
-                    if sadece_nobet and atanan_kisi_clean not in nobetci_isimleri_clean:
+                    if not disi_ver and atanan_kisi_clean not in nobetci_isimleri_clean:
                         continue
 
                     yeni_atama_listesi.append(eski_atama_satiri.iloc[0].to_dict())
                     continue
 
+                # disi_ver True ise sadece_nobetci=False yapılır, böylece nöbetçi dışı öğretmenler de sisteme dahil olur ama kurallara uyar
                 musaitler = uygun_ogretmenleri_bul(df_ders, tarih, gun, saat, g_ogrt, g_brans, oto_brans,
-                                                   sadece_nobetci=sadece_nobet)
+                                                   sadece_nobetci=(not disi_ver))
                 if musaitler:
                     atama = musaitler[0]
                     yeni_atama_listesi.append({
@@ -588,7 +592,6 @@ with tab1:
                 with st.expander(f"🔴 {g_ogrt} ({g_mazeret}) {'🔒 (Onaylandı)' if g_onayli else '🔓 (Beklemede)'}",
                                  expanded=True):
 
-                    # Her gelmeyen öğretmen için genişletici içinde ayar kutuları
                     c_ayar1, c_ayar2 = st.columns(2)
                     with c_ayar1:
                         mevcut_disi_val = st.session_state.get(f"disi_cb_{orig_idx}", False)
