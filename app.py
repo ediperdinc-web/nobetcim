@@ -400,7 +400,6 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        # Sadece otomatik görevlendirme motoru çalışırken 'sadece_nobetci' kuralı filtrelenir
         if is_nobetci == 0 and sadece_nobetci:
             toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
             if toplam_ders < 1: continue
@@ -428,14 +427,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
     for lst in [musait_nobetciler, musait_digerleri]:
         lst.sort(key=lambda x: (-x["is_same_branch"], x["count"]))
 
-    # Manuel seçim ekranında nöbetçiler üstte, diğer dersi boş olanlar arkasından listelenir
-    if not sadece_nobetci:
-        return musait_nobetciler + musait_digerleri
-
-    if musait_nobetciler:
-        return musait_nobetciler
-    else:
-        return musait_digerleri
+    return musait_nobetciler + musait_digerleri
 
 
 def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
@@ -549,6 +541,8 @@ with tab1:
             secilen_gelmeyen_saatler = st.multiselect("Gelmeyen Ders Saatleri", options=list(range(1, 9)),
                                                       default=list(range(1, 9)))
             form_brans_onceligi = st.checkbox("🔍 Branş Önceliği Uygula", value=True, key="form_brans_cb")
+            form_disi_cb = st.checkbox("🌐 Nöbetçi Dışı Öğretmenler de Görevlendirilebilsin", value=False,
+                                       key="form_disi_cb")
 
             if st.form_submit_button("🚀 Kaydet ve Otomatik Görevlendir", type="primary"):
                 if secilen_anlik_ogretmen in ["Lütfen Öğretmen Seçin...", "Tüm Öğretmenler"]:
@@ -573,6 +567,7 @@ with tab1:
 
                         yeni_idx = mevcut.index[-1]
                         st.session_state[f"brans_cb_{yeni_idx}"] = form_brans_onceligi
+                        st.session_state[f"disi_cb_{yeni_idx}"] = form_disi_cb
 
                         otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
                         st.success("Başarıyla kaydedildi ve otomatik görevlendirildi!")
@@ -592,6 +587,26 @@ with tab1:
 
                 with st.expander(f"🔴 {g_ogrt} ({g_mazeret}) {'🔒 (Onaylandı)' if g_onayli else '🔓 (Beklemede)'}",
                                  expanded=True):
+
+                    # Her gelmeyen öğretmen için genişletici içinde ayar kutuları
+                    c_ayar1, c_ayar2 = st.columns(2)
+                    with c_ayar1:
+                        mevcut_disi_val = st.session_state.get(f"disi_cb_{orig_idx}", False)
+                        yeni_disi_val = st.checkbox("Nöbetçi Dışı Ver", value=mevcut_disi_val,
+                                                    key=f"disi_cb_exp_{orig_idx}")
+                        if yeni_disi_val != mevcut_disi_val:
+                            st.session_state[f"disi_cb_{orig_idx}"] = yeni_disi_val
+                            otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
+                            st.rerun()
+                    with c_ayar2:
+                        mevcut_brans_val = st.session_state.get(f"brans_cb_{orig_idx}", True)
+                        yeni_brans_val = st.checkbox("Branş Önceliği", value=mevcut_brans_val,
+                                                     key=f"brans_cb_exp_{orig_idx}")
+                        if yeni_brans_val != mevcut_brans_val:
+                            st.session_state[f"brans_cb_{orig_idx}"] = yeni_brans_val
+                            otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
+                            st.rerun()
+
                     mevcut_gorevler = st.session_state.assignment_history[
                         (st.session_state.assignment_history["Tarih"].astype(str).str[:10] == str(t1_tarih)[:10]) &
                         (st.session_state.assignment_history["Gelmeyen Öğretmen"].apply(tr_normalize) == tr_normalize(
@@ -627,7 +642,6 @@ with tab1:
 
                             col_degis1, col_degis2 = st.columns([3, 1])
                             with col_degis1:
-                                # Manuel seçimde sadece_nobetci=False verilerek tüm boş dersli öğretmenlerin listelenmesi sağlanır
                                 musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat, g_ogrt,
                                                                         "", False, sadece_nobetci=False)
 
