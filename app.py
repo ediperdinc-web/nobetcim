@@ -400,7 +400,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        # --- OTOMATİK MOTOR İÇİN KURAL KONTROLÜ ---
+        # Sadece otomatik görevlendirme motoru çalışırken 'sadece_nobetci' kuralı filtrelenir
         if is_nobetci == 0 and sadece_nobetci:
             toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
             if toplam_ders < 1: continue
@@ -428,7 +428,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
     for lst in [musait_nobetciler, musait_digerleri]:
         lst.sort(key=lambda x: (-x["is_same_branch"], x["count"]))
 
-    # --- MANUEL GÖRÜNÜM İÇİN: NÖBETÇİLER ÖNCE, DİĞERLERİ ARKADAN ---
+    # Manuel seçim ekranında nöbetçiler üstte, diğer dersi boş olanlar arkasından listelenir
     if not sadece_nobetci:
         return musait_nobetciler + musait_digerleri
 
@@ -627,7 +627,7 @@ with tab1:
 
                             col_degis1, col_degis2 = st.columns([3, 1])
                             with col_degis1:
-                                # --- MANUEL LİSTE: NÖBETÇİLER + DİĞER MÜSAİTLER ---
+                                # Manuel seçimde sadece_nobetci=False verilerek tüm boş dersli öğretmenlerin listelenmesi sağlanır
                                 musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat, g_ogrt,
                                                                         "", False, sadece_nobetci=False)
 
@@ -649,7 +649,7 @@ with tab1:
                                     secilen_ogretmen_adi = aday_map[secilen_manuel]
                                     ogr_satir_secilen = ogretmen_satiri_bul(df_ders, secilen_ogretmen_adi, ogrt_col)
                                     s_brans = str(ogr_satir_secilen[brans_col].values[
-                                                      0]) if not ogr_satir_secilen.empty and brans_col in ogr_satir_secilen.columns else ""
+                                                      0]) if not ogr_satir_secilen.empty and brans_col in ogrt_satir_secilen.columns else ""
 
                                     hist = st.session_state.assignment_history
                                     tarih_str = str(t1_tarih)[:10]
