@@ -215,7 +215,10 @@ def gelmeyenleri_kaydet(df): df.to_csv(gelmeyen_dosyasi, index=False)
 
 def geri_bildirimleri_yukle():
     if os.path.exists(geri_bildirim_dosyasi):
-        return pd.read_csv(geri_bildirim_dosyasi)
+        df = pd.read_csv(geri_bildirim_dosyasi)
+        if "Durum" not in df.columns:
+            df["Durum"] = "Beklemede"
+        return df
     return pd.DataFrame(columns=["Tarih", "Kullanıcı", "Konu", "Mesaj", "Durum"])
 
 
@@ -401,7 +404,6 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        # Eğer manuel seçim için çağrılmadıysa (otomatik motor çalışıyorsa) katı kurallar uygulanır
         if not manuel_secim:
             if sadece_nobetci and is_nobetci == 0:
                 continue
@@ -432,10 +434,6 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
     for lst in [musait_nobetciler, musait_digerleri]:
         lst.sort(key=lambda x: (-x["is_same_branch"], x["count"]))
-
-    # Manuel seçimde nöbetçiler üstte, diğer dersi boş olan tüm öğretmenler arkasından listelenir
-    if manuel_secim:
-        return musait_nobetciler + musait_digerleri
 
     return musait_nobetciler + musait_digerleri
 
@@ -651,7 +649,6 @@ with tab1:
 
                             col_degis1, col_degis2 = st.columns([3, 1])
                             with col_degis1:
-                                # Manuel seçimde öğretmenlerin listede eksiksiz görünmesi için manuel_secim=True verilir
                                 musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat, g_ogrt,
                                                                         "", False, sadece_nobetci=False,
                                                                         manuel_secim=True)
@@ -1093,7 +1090,7 @@ with tab8:
         konu_secimi = st.selectbox("Bildirim Konusu", ["Ders Programı / Veri Hatası", "Nöbet Dağıtım Hatası / İsteği",
                                                        "Arayüz / Tasarım Önerisi", "Diğer"])
         mesaj_detayi = st.text_area("Hata Açıklaması veya Eklenmesini / Düzeltilmesini İstediğiniz Veriler",
-                                    placeholder="Örn: Ahmet Yılmaz'ın Çarşamba günü 3. ve 4. saati boş görünmesine rağmen atama yapılırken hata oluştu. Düzeltilmesini rica ederim.")
+                                    placeholder="Örn: Ahmet Yılmaz'ın Çarşamba günü 3. ve 4. saati görünmesine rağmen atama yapılırken hata oluştu. Düzeltilmesini rica ederim.")
 
         if st.form_submit_button("🚀 Geri Bildirimi Gönder", type="primary"):
             if not mesaj_detayi.strip():
@@ -1118,10 +1115,33 @@ with tab8:
         st.markdown("---")
         st.markdown("#### 📥 Yönetici Paneli: İletilen Tüm Geri Bildirimler ve Talepler")
         if not st.session_state.geri_bildirim_listesi.empty:
-            st.dataframe(st.session_state.geri_bildirim_listesi, use_container_width=True, hide_index=True)
+            st.write(
+                "💡 Tablo üzerindeki **'Durum'** sütununu tıklayarak bildirimlerin durumunu (Beklemede, İnceleniyor, Çözüldü vb.) güncelleyebilir veya satırları silebilirsiniz.")
 
-            with open(geri_bildirim_dosyasi, "rb") as f:
-                st.download_button("📥 Geri Bildirim Raporunu İndir (CSV)", data=f, file_name="geri_bildirimler.csv",
-                                   mime="text/html")
+            edited_bildirimler = st.data_editor(
+                st.session_state.geri_bildirim_listesi,
+                column_config={
+                    "Durum": st.column_config.SelectboxColumn(
+                        "Durum",
+                        options=["Beklemede", "İnceleniyor", "Çözüldü", "Reddedildi"],
+                        required=True
+                    )
+                },
+                use_container_width=True,
+                num_rows="dynamic",
+                key="geri_bildirim_editor"
+            )
+
+            col_b1, col_b2 = st.columns([2, 1])
+            with col_b1:
+                if st.button("💾 Geri Bildirim Durumlarını ve Değişiklikleri Kaydet", type="primary"):
+                    st.session_state.geri_bildirim_listesi = edited_bildirimler
+                    geri_bildirimleri_kaydet(edited_bildirimler)
+                    st.success("✅ Geri bildirim durumları başarıyla güncellendi!")
+                    st.rerun()
+            with col_b2:
+                with open(geri_bildirim_dosyasi, "rb") as f:
+                    st.download_button("📥 Raporu İndir (CSV)", data=f, file_name="geri_bildirimler.csv",
+                                       mime="text/csv")
         else:
             st.info("Henüz iletilen bir geri bildirim bulunmuyor.")
