@@ -12,32 +12,84 @@ st.set_page_config(
     layout="wide",
 )
 
-# --- MODERN ARAYÜZ İÇİN ÖZEL CSS DOKUNUŞLARI ---
+# --- MODERN UI & CSS STYLING ---
 st.markdown("""
     <style>
-    /* Ana arayüz font ve genel ferahlık */
-    .main {
-        background-color: #f8f9fa;
+    /* Google Fonts Entegrasyonu */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', sans-serif;
     }
-    /* Kart/Konteyner Stilleri */
-    .stApp div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"] {
+
+    /* Arka Plan Ferahlığı */
+    .main {
+        background-color: #f4f6f9;
+    }
+
+    /* Kart Yapıları (Container Stilleri) */
+    div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"] {
         gap: 1.5rem;
     }
-    /* Butonları modernize etme */
+
+    /* Buton Tasarımları (Modern Hover ve Köşeler) */
     div.stButton > button {
-        border-radius: 8px;
-        font-weight: 500;
-        transition: all 0.3s ease;
+        border-radius: 10px;
+        font-weight: 600;
+        padding: 0.5rem 1rem;
+        border: 1px solid #d0d7de;
+        background-color: #ffffff;
+        color: #24292f;
+        transition: all 0.2s ease-in-out;
     }
     div.stButton > button:hover {
-        border-color: #0d6efd;
-        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.15);
+        border-color: #0969da;
+        color: #0969da;
+        box-shadow: 0 3px 8px rgba(9, 105, 218, 0.12);
     }
-    /* Expander şıklığı */
+
+    /* Birincil Butonlar */
+    div.stButton > button[kind="primary"] {
+        background-color: #0969da;
+        color: #ffffff;
+        border: none;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        background-color: #0860c4;
+        box-shadow: 0 4px 12px rgba(9, 105, 218, 0.25);
+    }
+
+    /* Sekme (Tabs) Modernizasyonu */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #ffffff;
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid #e1e4e8;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        font-weight: 600;
+        color: #57606a;
+        padding: 8px 16px;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #0969da !important;
+        color: #ffffff !important;
+    }
+
+    /* Expander Şıklığı */
     .streamlit-expanderHeader {
         background-color: #ffffff;
-        border-radius: 8px;
-        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        border: 1px solid #e1e4e8;
+        font-weight: 600;
+    }
+
+    /* Tablo ve Veri Izgaraları */
+    dataframe {
+        border-radius: 10px;
+        border: 1px solid #e1e4e8;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -111,7 +163,7 @@ if not st.session_state.logged_in:
         with st.sidebar.form("kayit_form"):
             k_ad = st.text_input("Kullanıcı Adı")
             okul = st.text_input("Kurum / Okul İsmi")
-            kod = st.text_input("Kurum Kodu (6 haneli MEBBİS kodu)", max_chars=6)
+            kod = st.text_input("Kurum Kodu (6 haneli MEBBİS)", max_chars=6)
             mudur = st.text_input("Müdür Adı Soyadı")
             mail = st.text_input("E-posta")
             tel = st.text_input("Telefon")
@@ -152,23 +204,14 @@ if not st.session_state.logged_in:
                         bulundu = True
                         break
                     else:
-                        st.error("Şifreler uyuşmuyor veya boş.")
+                        st.error("Şifreler uyuşmuyor.")
                         bulundu = True
                         break
             if not bulundu:
                 st.error("Kayıt bulunamadı.")
 
     st.title("🏫 Nöbetçim - Okul Nöbet ve Görevlendirme Sistemi")
-    st.info("👋 Hoş geldiniz! Devam etmek için lütfen sol taraftaki panelden giriş yapın veya yeni hesap oluşturun.")
-
-    st.markdown("---")
-    st.markdown("### 🚀 Nöbetçim Sistemi ile Neler Yapabilirsiniz?")
-    st.markdown("""
-    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programını kolayca yükleyin ve yönetin.
-    * **⚡ Otomatik Acil Görevlendirme:** Gelmeyen öğretmenlerin derslerine en adil şekilde otomatik görevlendirme yapın.
-    * **📅 Günlük Nöbetçi Listesi:** Kat ve yer bazlı günlük nöbetçileri belirleyip tek tıkla çıktı alın.
-    * **📄 Resmi Tebligat Raporları:** Onaylanan görevlendirmeleri resmi imza listesi formatında indirin.
-    """)
+    st.info("👋 Hoş geldiniz! Devam etmek için lütfen sol taraftaki panelden giriş yapın.")
     st.stop()
 
 aktif_kullanici = st.session_state.current_user
@@ -301,13 +344,13 @@ if "geri_bildirim_listesi" not in st.session_state: st.session_state.geri_bildir
 if "secilen_tarih" not in st.session_state: st.session_state.secilen_tarih = datetime.date.today()
 if "sifirlama_onayi" not in st.session_state: st.session_state.sifirlama_onayi = False
 
-# Sidebar Modern Profil Kartı
+# Sidebar Şık Profil Alanı
 with st.sidebar:
     st.markdown(f"""
-        <div style="padding: 12px; background: #e9ecef; border-radius: 8px; margin-bottom: 15px;">
-            <p style="margin: 0; font-size: 13px; color: #6c757d;">Aktif Oturum</p>
-            <p style="margin: 0; font-weight: bold; color: #212529;">👤 {aktif_kullanici}</p>
-            <p style="margin: 4px 0 0 0; font-size: 12px; color: #0d6efd;">🏢 {okul_bilgisi}</p>
+        <div style="padding: 16px; background: #ffffff; border: 1px solid #e1e4e8; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+            <p style="margin: 0; font-size: 11px; font-weight: 700; color: #57606a; text-transform: uppercase;">Aktif Oturum</p>
+            <p style="margin: 4px 0 0 0; font-weight: 700; font-size: 15px; color: #24292f;">👤 {aktif_kullanici}</p>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: #0969da; font-weight: 600;">🏢 {okul_bilgisi}</p>
         </div>
     """, unsafe_allow_html=True)
     if st.button("🚪 Çıkış Yap", use_container_width=True):
@@ -317,16 +360,16 @@ with st.sidebar:
 
 st.title(f"🏫 {okul_bilgisi} | Nöbetçim")
 
-# --- SEKMELER (MENÜLER) ---
+# --- SEKMELER ---
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📋 Ders Programı & Görevlendir",
-    "🛡️ Toplu Öğretmen & Nöbet Yönetimi",
+    "🛡️ Toplu Öğretmen & Nöbet",
     "📅 Günlük Nöbetçi Listesi",
     "📊 Toplam Görevlendirme",
-    "📚 Öğretmen Ders Programları",
-    "📁 Excel & Veri Yönetimi",
+    "📚 Öğretmen Programları",
+    "📁 Excel & Veri",
     "👤 Kurum Bilgileri",
-    "💬 Geri Bildirim & Hata Bildir"
+    "💬 Geri Bildirim"
 ])
 
 df_ders = dosya_okuma_yoneticisi(dosya_adi)
@@ -545,7 +588,7 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
 
 # --- 1. SEKME: GÖREVLENDİRME VE CANLI ÖNİZLEME ---
 with tab1:
-    st.subheader("📋 Gelmeyen Öğretmenler, Canlı Önizleme ve Otomatik Görevlendirme")
+    st.subheader("📋 Gelmeyen Öğretmenler ve Otomatik Görevlendirme")
     col_t1, col_t2 = st.columns([2, 3])
     with col_t1:
         t1_tarih = st.date_input("İşlem Yapılacak Tarih", value=st.session_state.secilen_tarih)
@@ -582,7 +625,7 @@ with tab1:
                                                       default=list(range(1, 9)))
             form_brans_onceligi = st.checkbox("🔍 Branş Önceliği Uygula", value=True, key="form_brans_cb")
 
-            if st.form_submit_button("🚀 Kaydet ve Otomatik Görevlendir", type="primary"):
+            if st.form_submit_button("🚀 Kaydet ve Otomatik Görevlendir", type="primary", use_container_width=True):
                 if secilen_anlik_ogretmen in ["Lütfen Öğretmen Seçin...", "Tüm Öğretmenler"]:
                     st.warning("Lütfen geçerli bir öğretmen seçin.")
                 elif not secilen_gelmeyen_saatler:
@@ -611,7 +654,7 @@ with tab1:
                         st.rerun()
 
     with col_sag:
-        st.markdown("#### 👤 Kayıtlı Gelmeyenler, Manuel Değişiklik ve Onay Ekranı")
+        st.markdown("#### 👤 Kayıtlı Gelmeyenler ve Manuel Düzenleme")
         ogun_gelmeyenler_df = st.session_state.gelmeyen_listesi[
             st.session_state.gelmeyen_listesi["Tarih"].astype(str).str[:10] == str(t1_tarih)[:10]].copy()
 
@@ -709,41 +752,41 @@ with tab1:
                                                                                         ignore_index=True)
 
                                     gecmisi_kaydet(st.session_state.assignment_history)
-                                    st.success(
-                                        f"✅ {saat}. saat için görevli {secilen_ogretmen_adi} olarak güncellendi!")
+                                    st.success(f"✅ {saat}. saat güncellendi!")
                                     st.rerun()
 
                             with col_degis2:
-                                if not match_atama.empty and st.button("🗑️ Sil", key=f"tek_sil_{orig_idx}_{saat}"):
+                                if not match_atama.empty and st.button("🗑️ Sil", key=f"tek_sil_{orig_idx}_{saat}",
+                                                                       use_container_width=True):
                                     idx_to_drop = match_atama.index
                                     st.session_state.assignment_history = st.session_state.assignment_history.drop(
                                         idx_to_drop).reset_index(drop=True)
                                     gecmisi_kaydet(st.session_state.assignment_history)
-                                    st.success(f"{saat}. saatin görevi silindi.")
+                                    st.success("Görev silindi.")
                                     st.rerun()
                         else:
-                            st.markdown(f"**{saat}. Saat** | 🔴 Boş Saat (İşlem Yapılamaz)")
+                            st.markdown(f"**{saat}. Saat** | 🔴 Boş Saat")
 
                         st.markdown("---")
 
                     c_onay, c_sil = st.columns(2)
                     with c_onay:
-                        if not g_onayli and st.button("✅ Onayla", key=f"onay_{orig_idx}"):
+                        if not g_onayli and st.button("✅ Onayla", key=f"onay_{orig_idx}", use_container_width=True):
                             st.session_state.gelmeyen_listesi.loc[orig_idx, "Onaylandi"] = True
                             gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                             st.success("Onaylandı!")
                             st.rerun()
-                        elif g_onayli and st.button("🔓 Onayı Kaldır", key=f"kaldir_{orig_idx}"):
+                        elif g_onayli and st.button("🔓 Kaldır", key=f"kaldir_{orig_idx}", use_container_width=True):
                             st.session_state.gelmeyen_listesi.loc[orig_idx, "Onaylandi"] = False
                             gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                             st.rerun()
                     with c_sil:
-                        if st.button("🗑️ Gelmeyeni Tamamen Sil", key=f"sil_{orig_idx}"):
+                        if st.button("🗑️ Kaydı Sil", key=f"sil_{orig_idx}", use_container_width=True):
                             st.session_state.gelmeyen_listesi = st.session_state.gelmeyen_listesi.drop(
                                 orig_idx).reset_index(drop=True)
                             gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                             otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
-                            st.success("Kayıt silindi.")
+                            st.success("Silindi.")
                             st.rerun()
         else:
             st.info("Bu tarih için kayıtlı gelmeyen öğretmen yok.")
@@ -766,13 +809,13 @@ with tab1:
                                      for i, r in tarihli_gorevler.iterrows()])
             if tum_onayli:
                 html_print = f"<html><head><meta charset='UTF-8'></head><body><h3 style='text-align:center;'>{il_bilgisi.upper()} VALİLİĞİ<br>{ilce_bilgisi.upper()} İLÇE MİLLİ EĞİTİM MÜDÜRLÜĞÜ<br>{okul_bilgisi.upper()} MÜDÜRLÜĞÜ</h3><table border='1' width='100%' style='border-collapse:collapse;' cellpadding='8'><thead><tr><th>S.No</th><th>Ders Saati</th><th>Gelmeyen Öğretmen</th><th>Görevlendirilen Öğretmen</th><th>İmza</th></tr></thead><tbody>{table_rows}</tbody></table><br><p style='float:right;'><strong>{mudur_bilgisi}</strong><br>Okul Müdürü</p></body></html>"
-                st.download_button("📄 Tebligat Çıktı Dosyasını İndir (HTML)", data=html_print,
+                st.download_button("📄 Tebligat Çıktısını İndir (HTML)", data=html_print,
                                    file_name=f"Tebligat_{t1_tarih}.html", mime="text/html")
             else:
-                st.warning("🔒 Çıktı alabilmek için günün tüm gelmeyen öğretmen görevlendirmelerini onaylayın.")
+                st.warning("🔒 Çıktı alabilmek için günün tüm görevlendirmelerini onaylayın.")
 
         if not ogun_gelmeyenler_df.empty and not ogun_gelmeyenler_df["Onaylandi"].all():
-            if st.button("✅ Tüm Görevlendirmeleri Toplu Olarak Onayla"):
+            if st.button("✅ Tümünü Toplu Olarak Onayla", type="primary"):
                 st.session_state.gelmeyen_listesi.loc[ogun_gelmeyenler_df.index, "Onaylandi"] = True
                 gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                 st.success("Tüm görevlendirmeler onaylandı!")
@@ -781,8 +824,7 @@ with tab1:
 # --- 2. SEKME: TOPLU ÖĞRETMEN & NÖBET YÖNETİMİ ---
 with tab2:
     st.subheader("🛡️ Toplu Öğretmen, Nöbet ve Muafiyet Yönetimi")
-    st.write(
-        "Okulunuzdaki tüm öğretmenlerin nöbet muafiyet durumlarını aşağıdaki tablodan toplu olarak görebilir ve tek tıkla güncelleyebilirsiniz.")
+    st.write("Okulunuzdaki tüm öğretmenlerin nöbet muafiyet durumlarını aşağıdaki tablodan yönetebilirsiniz.")
 
     if ham_ogretmenler:
         muaf_dict = st.session_state.muafiyet_listesi
@@ -810,15 +852,14 @@ with tab2:
                 column_config={
                     "Öğretmen Adı": st.column_config.TextColumn("Öğretmen Adı", disabled=True),
                     "Branş": st.column_config.TextColumn("Branş", disabled=True),
-                    "Nöbet Tutabilir mi?": st.column_config.CheckboxColumn("Nöbet Tutabilir mi?",
-                                                                           help="İşaretli ise nöbet tutar, işaretsiz ise nöbet muafıdır.")
+                    "Nöbet Tutabilir mi?": st.column_config.CheckboxColumn("Nöbet Tutabilir mi?")
                 },
                 hide_index=True,
                 use_container_width=True,
                 key="muafiyet_data_editor"
             )
 
-            if st.form_submit_button("💾 Değişiklikleri Kaydet", type="primary"):
+            if st.form_submit_button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True):
                 for _, row in edited_df.iterrows():
                     ogr_adi = row["Öğretmen Adı"]
                     yeni_durum = row["Nöbet Tutabilir mi?"]
@@ -829,10 +870,10 @@ with tab2:
                     st.session_state.muafiyet_listesi[ogr_adi]["nobet_tutmuyor"] = not yeni_durum
 
                 muafiyetleri_kaydet(st.session_state.muafiyet_listesi)
-                st.success("✅ Tüm öğretmenlerin nöbet muafiyet durumları başarıyla güncellendi!")
+                st.success("✅ Nöbet muafiyet durumları başarıyla güncellendi!")
                 st.rerun()
     else:
-        st.warning("⚠️ Henüz ders programı yüklenmemiş veya öğretmen bulunamadı.")
+        st.warning("⚠️ Ders programı yüklenmemiş veya öğretmen bulunamadı.")
 
 # --- 3. SEKME: GÜNLÜK NÖBETÇİ LİSTESİ ---
 with tab3:
@@ -859,13 +900,13 @@ with tab3:
                     ].empty
 
                 if zaten_var:
-                    st.warning(f"⚠️ {eklenecek_nobetci} adlı öğretmen {n_gun} günü zaten nöbetçi olarak eklenmiş!")
+                    st.warning(f"⚠️ {eklenecek_nobetci} bu gün zaten nöbetçi!")
                 else:
                     yeni_n = pd.DataFrame(
                         {"Gün": [n_gun], "Nöbet Yeri": [nobet_yeri], "Öğretmen Adı": [eklenecek_nobetci]})
                     st.session_state.nobet_listesi = pd.concat([mevcut_nobetciler, yeni_n], ignore_index=True)
                     nobetleri_kaydet(st.session_state.nobet_listesi)
-                    st.success("Nöbetçi başarıyla eklendi!")
+                    st.success("Nöbetçi eklendi!")
                     st.rerun()
 
     with col_n2:
@@ -890,22 +931,22 @@ with tab3:
                     if st.button("🗑️ Nöbeti Sil", key=f"sil_nobet_{idx}"):
                         st.session_state.nobet_listesi = st.session_state.nobet_listesi.drop(idx).reset_index(drop=True)
                         nobetleri_kaydet(st.session_state.nobet_listesi)
-                        st.success("Nöbet silindi.")
+                        st.success("Silindi.")
                         st.rerun()
         else:
             st.info("Bu gün için eklenmiş nöbetçi yok.")
 
     st.markdown("---")
-    st.markdown(f"### 🖨️ Günlük Nöbetçi Listesi Yazdırma ({n_tarih.strftime('%d.%m.%Y')})")
+    st.markdown(f"### 🖨️ Nöbetçi Listesi Çıktısı ({n_tarih.strftime('%d.%m.%Y')})")
     if not gunluk_nobetciler.empty:
         n_table_rows = "".join([
                                    f"<tr><td style='text-align: center;'>{i + 1}</td><td>{r['Öğretmen Adı']}</td><td>{r['Nöbet Yeri']}</td><td></td></tr>"
                                    for i, r in gunluk_nobetciler.reset_index(drop=True).iterrows()])
         n_html_print = f"<html><head><meta charset='UTF-8'></head><body><h3 style='text-align:center;'>{il_bilgisi.upper()} VALİLİĞİ<br>{ilce_bilgisi.upper()} İLÇE MİLLİ EĞİTİM MÜDÜRLÜĞÜ<br>{okul_bilgisi.upper()} MÜDÜRLÜĞÜ<br><br>{n_tarih.strftime('%d.%m.%Y')} ({n_gun}) GÜNLÜK NÖBETÇİ ÖĞRETMENLER LİSTESİ</h3><table border='1' width='100%' style='border-collapse:collapse; margin-top:20px; font-size:14px;' cellpadding='8'><thead><tr><th>S.No</th><th>Öğretmen Adı Soyadı</th><th>Nöbet Yeri / Kat</th><th>İmza</th></tr></thead><tbody>{n_table_rows}</tbody></table><br><br><p style='float:right;'><strong>{mudur_bilgisi}</strong><br>Okul Müdürü</p></body></html>"
-        st.download_button("📄 Günlük Nöbetçi Listesi Çıktısını İndir (HTML)", data=n_html_print,
+        st.download_button("📄 Nöbetçi Listesi Çıktısını İndir (HTML)", data=n_html_print,
                            file_name=f"Nobetci_Listesi_{n_tarih}.html", mime="text/html")
     else:
-        st.info("Çıktı alabilmek için bu güne ait nöbetçi öğretmen ekleyin.")
+        st.info("Çıktı alabilmek için nöbetçi ekleyin.")
 
 # --- 4. SEKME: TOPLAM GÖREVLENDİRME ---
 with tab4:
@@ -930,23 +971,23 @@ with tab4:
                 st.session_state.sifirlama_onayi = True
                 st.rerun()
         else:
-            st.warning("⚠️ **DİKKAT:** Tüm görevlendirme geçmişi ve sayıları sıfırlanacaktır!")
+            st.warning("⚠️ **DİKKAT:** Tüm geçmiş sıfırlanacaktır!")
             col_onay1, col_onay2 = st.columns(2)
             with col_onay1:
-                if st.button("Evet, Kesinlikle Sıfırla", type="primary"):
+                if st.button("Evet, Sıfırla", type="primary", use_container_width=True):
                     st.session_state.assignment_history = pd.DataFrame(
                         columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen",
                                  "Branş"])
                     gecmisi_kaydet(st.session_state.assignment_history)
                     st.session_state.sifirlama_onayi = False
-                    st.success("Tüm görevlendirme geçmişi sıfırlandı!")
+                    st.success("Geçmiş sıfırlandı!")
                     st.rerun()
             with col_onay2:
-                if st.button("Vazgeç / İptal Et"):
+                if st.button("Vazgeç", use_container_width=True):
                     st.session_state.sifirlama_onayi = False
                     st.rerun()
     else:
-        st.info("Henüz gerçekleştirilmiş bir görevlendirme kaydı bulunmuyor.")
+        st.info("Henüz gerçekleştirilmiş görevlendirme kaydı bulunmuyor.")
 
 # --- 5. SEKME: ÖĞRETMEN DERS PROGRAMLARI ---
 with tab5:
@@ -1036,7 +1077,7 @@ with tab5:
             edited_ogrt_df = st.data_editor(alt_df, hide_index=True, use_container_width=True,
                                             key=f"editor_ogrt_{idx_orig}")
 
-            if st.button("💾 Değişiklikleri ve Branşı Kaydet", type="primary"):
+            if st.button("💾 Değişiklikleri ve Branşı Kaydet", type="primary", use_container_width=True):
                 if brans_col in df_ders.columns:
                     df_ders.loc[idx_orig, brans_col] = yeni_brans_input
 
@@ -1046,10 +1087,10 @@ with tab5:
                         df_ders.loc[idx_orig, orig_col] = yeni_val
 
                 df_ders.to_excel(dosya_adi, index=False)
-                st.success("✅ Öğretmen ders programı güncellendi!")
+                st.success("✅ Program güncellendi!")
                 st.rerun()
     else:
-        st.info("Lütfen yukarıdan bir öğretmen seçin.")
+        st.info("Lütfen bir öğretmen seçin.")
 
 # --- 6. SEKME: EXCEL & VERİ YÖNETİMİ ---
 with tab6:
@@ -1058,7 +1099,8 @@ with tab6:
 
     with open(dosya_adi, "rb") as f:
         st.download_button("📥 Güncel Excel Şablonunu İndir", data=f, file_name="okul_ders_programi.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           use_container_width=True)
 
     yuklenen = st.file_uploader("Yeni Excel Dosyası Yükle", type=["xlsx", "xls"])
     if yuklenen:
@@ -1073,7 +1115,7 @@ with tab7:
     y_ilce = st.text_input("İlçe Adı", value=user_data.get("ilce", ""))
     y_il = st.text_input("İl Adı", value=user_data.get("il", ""))
 
-    if st.button("Bilgileri Güncelle"):
+    if st.button("Bilgileri Güncelle", type="primary", use_container_width=True):
         st.session_state.users = kullanicilari_yukle()
         if aktif_kullanici in st.session_state.users:
             st.session_state.users[aktif_kullanici].update(
@@ -1085,14 +1127,14 @@ with tab7:
 # --- 8. SEKME: GERİ BİLDİRİM & HATA BİLDİR ---
 with tab8:
     st.subheader("💬 Geri Bildirim ve Hata Bildir")
-    st.write("Sistemde karşılaştığınız hataları veya önerilerinizi doğrudan iletebilirsiniz.")
+    st.write("Sistemle ilgili görüş ve önerilerinizi iletebilirsiniz.")
 
     with st.form("geri_bildirim_form"):
         konu_secimi = st.selectbox("Bildirim Konusu", ["Ders Programı / Veri Hatası", "Nöbet Dağıtım Hatası / İsteği",
                                                        "Arayüz / Tasarım Önerisi", "Diğer"])
         mesaj_detayi = st.text_area("Açıklama", placeholder="Görüş ve önerilerinizi yazabilirsiniz...")
 
-        if st.form_submit_button("🚀 Geri Bildirimi Gönder", type="primary"):
+        if st.form_submit_button("🚀 Geri Bildirimi Gönder", type="primary", use_container_width=True):
             if not mesaj_detayi.strip():
                 st.warning("Lütfen açıklama yazın.")
             else:
@@ -1107,7 +1149,7 @@ with tab8:
                 st.session_state.geri_bildirim_listesi = pd.concat(
                     [st.session_state.geri_bildirim_listesi, yeni_bildirim], ignore_index=True)
                 geri_bildirimleri_kaydet(st.session_state.geri_bildirim_listesi)
-                st.success("🎉 Geri bildiriminiz başarıyla iletildi!")
+                st.success("🎉 Geri bildiriminiz iletildi!")
                 st.rerun()
 
     if aktif_kullanici == "ediperdinc":
@@ -1116,6 +1158,7 @@ with tab8:
         if not st.session_state.geri_bildirim_listesi.empty:
             st.dataframe(st.session_state.geri_bildirim_listesi, use_container_width=True, hide_index=True)
             with open(geri_bildirim_dosyasi, "rb") as f:
-                st.download_button("📥 Raporu İndir (CSV)", data=f, file_name="geri_bildirimler.csv", mime="text/html")
+                st.download_button("📥 Raporu İndir (CSV)", data=f, file_name="geri_bildirimler.csv", mime="text/html",
+                                   use_container_width=True)
         else:
             st.info("Henüz bildirilen bir geri bildirim yok.")
