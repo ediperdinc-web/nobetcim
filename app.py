@@ -208,20 +208,6 @@ if not st.session_state.logged_in:
     st.title("🏫 Nöbetçim - Okul Nöbet ve Görevlendirme Sistemi")
     st.info(
         "👋 Hoş geldiniz! Devam etmek için lütfen sol taraftaki panelden giriş yapın veya hemen ücretsiz kayıt olun.")
-
-    st.markdown("---")
-    st.markdown("### 🚀 Nöbetçim Sistemi ile Neler Yapabilirsiniz?")
-    st.markdown("""
-    Bu sistem okullardaki nöbet ve ders görevlendirme süreçlerini tamamen dijitalleştirmek ve hızlandırmak için tasarlanmıştır. 
-
-    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programı Excel dosyasını yükleyerek tüm öğretmenlerin programını dijital ortamda görüntüleyin.
-    * **⚡ Otomatik Acil Görevlendirme:** Günlük olarak gelmeyen/izinli öğretmenlerin ders saatlerine, nöbetçi öğretmenler arasından en adil ve otomatik şekilde görevlendirme yapın.
-    * **📅 Günlük Nöbetçi Listesi:** Hangi gün kimin hangi katta/yerde nöbetçi olduğunu belirleyin ve bu listeyi günlük olarak tek tıkla çıktı alın.
-    * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alın.
-    * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip edin.
-    * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlayın.
-    * **💾 Günlük Yedekleme ve Kurtarma:** Tüm verilerinizi tek tıkla yedekleyin, olası bir durumda verilerinizi anında geri yükleyin.
-    """)
     st.stop()
 
 aktif_kullanici = st.session_state.current_user
@@ -248,22 +234,27 @@ def gecmisi_kaydet(df):
 
 def gecmisi_yukle():
     if os.path.exists(gecmis_dosyasi):
-        df = pd.read_csv(gecmis_dosyasi)
-        if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
-            df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"], keep="last").reset_index(
-                drop=True)
-        return df
+        try:
+            if os.path.getsize(gecmis_dosyasi) > 0:
+                df = pd.read_csv(gecmis_dosyasi)
+                if not df.empty and all(col in df.columns for col in ["Tarih", "Gelmeyen Öğretmen", "Ders Saati"]):
+                    df = df.drop_duplicates(subset=["Tarih", "Gelmeyen Öğretmen", "Ders Saati"],
+                                            keep="last").reset_index(drop=True)
+                return df
+        except Exception:
+            pass
     return pd.DataFrame(
         columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen", "Branş"])
 
 
 def muafiyetleri_yukle():
     if os.path.exists(muafiyet_dosyasi):
-        with open(muafiyet_dosyasi, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except:
-                return {}
+        try:
+            if os.path.getsize(muafiyet_dosyasi) > 0:
+                with open(muafiyet_dosyasi, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception:
+            pass
     return {}
 
 
@@ -272,7 +263,12 @@ def muafiyetleri_kaydet(muaf_dict):
 
 
 def nobetleri_yukle():
-    if os.path.exists(nobet_dosyasi): return pd.read_csv(nobet_dosyasi)
+    if os.path.exists(nobet_dosyasi):
+        try:
+            if os.path.getsize(nobet_dosyasi) > 0:
+                return pd.read_csv(nobet_dosyasi)
+        except Exception:
+            pass
     return pd.DataFrame(columns=["Gün", "Nöbet Yeri", "Öğretmen Adı"])
 
 
@@ -281,11 +277,15 @@ def nobetleri_kaydet(df): df.to_csv(nobet_dosyasi, index=False)
 
 def gelmeyenleri_yukle():
     if os.path.exists(gelmeyen_dosyasi):
-        df = pd.read_csv(gelmeyen_dosyasi)
-        if "Gelmeyen Saatler" not in df.columns: df["Gelmeyen Saatler"] = "1,2,3,4,5,6,7,8"
-        if "Mazeret" not in df.columns: df["Mazeret"] = "İzinli"
-        if "Onaylandi" not in df.columns: df["Onaylandi"] = False
-        return df
+        try:
+            if os.path.getsize(gelmeyen_dosyasi) > 0:
+                df = pd.read_csv(gelmeyen_dosyasi)
+                if "Gelmeyen Saatler" not in df.columns: df["Gelmeyen Saatler"] = "1,2,3,4,5,6,7,8"
+                if "Mazeret" not in df.columns: df["Mazeret"] = "İzinli"
+                if "Onaylandi" not in df.columns: df["Onaylandi"] = False
+                return df
+        except Exception:
+            pass
     return pd.DataFrame(columns=["Tarih", "Gün", "Öğretmen Adı", "Gelmeyen Saatler", "Mazeret", "Onaylandi"])
 
 
@@ -294,7 +294,11 @@ def gelmeyenleri_kaydet(df): df.to_csv(gelmeyen_dosyasi, index=False)
 
 def geri_bildirimleri_yukle():
     if os.path.exists(geri_bildirim_dosyasi):
-        return pd.read_csv(geri_bildirim_dosyasi)
+        try:
+            if os.path.getsize(geri_bildirim_dosyasi) > 0:
+                return pd.read_csv(geri_bildirim_dosyasi)
+        except Exception:
+            pass
     return pd.DataFrame(columns=["Tarih", "Kullanıcı", "Konu", "Mesaj", "Durum"])
 
 
@@ -1151,7 +1155,6 @@ with tab8:
         st.markdown("#### 📥 1. Sistem Yedeğini İndir")
         st.write("Verilerinizin güncel bir kopyasını bilgisayarınıza kaydedin.")
 
-        # Tüm verileri toplayıp bir JSON sözlüğünde paketleyelim
         yedek_paketi = {
             "aktif_kullanici": aktif_kullanici,
             "tarih": str(datetime.datetime.now()),
@@ -1162,8 +1165,6 @@ with tab8:
             "gecmis": gecmisi_yukle().to_dict(orient="records")
         }
 
-        # Excel dosyasını da okuyup base64 veya doğrudan JSON içine alabiliriz ya da ayrı ayrı sunabiliriz.
-        # En pratik yol, tüm JSON verilerini paketlemektir. Ders programı Excel dosyası zaten sunucuda kayıtlıdır.
         json_yedek_str = json.dumps(yedek_paketi, ensure_ascii=False, indent=4)
 
         st.download_button(
@@ -1195,24 +1196,20 @@ with tab8:
                 try:
                     icerik_json = json.load(yuklenen_yedek)
 
-                    # Muafiyetleri yükle ve kaydet
                     if "muafiyetler" in icerik_json:
                         muafiyetleri_kaydet(icerik_json["muafiyetler"])
                         st.session_state.muafiyet_listesi = icerik_json["muafiyetler"]
 
-                    # Gelmeyenleri yükle ve kaydet
                     if "gelmeyenler" in icerik_json:
                         df_g = pd.DataFrame(icerik_json["gelmeyenler"])
                         gelmeyenleri_kaydet(df_g)
                         st.session_state.gelmeyen_listesi = df_g
 
-                    # Nöbetleri yükle ve kaydet
                     if "nobetler" in icerik_json:
                         df_n = pd.DataFrame(icerik_json["nobetler"])
                         nobetleri_kaydet(df_n)
                         st.session_state.nobet_listesi = df_n
 
-                    # Geçmişi yükle ve kaydet
                     if "gecmis" in icerik_json:
                         df_h = pd.DataFrame(icerik_json["gecmis"])
                         gecmisi_kaydet(df_h)
