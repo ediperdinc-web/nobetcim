@@ -703,15 +703,16 @@ with tab1:
                 with st.expander(f"🔴 {g_ogrt} ({g_mazeret}) {'🔒 (Onaylandı)' if g_onayli else '🔓 (Beklemede)'}",
                                  expanded=True):
 
-                    # --- DİNAMİK NÖBET DIŞI / SADECE NÖBETÇİ SEÇENEĞİ ---
+                    # --- DİNAMİK NÖBET DIŞI / SADECE NÖBETÇİ SEÇENEĞİ (Onaylıyken kilitli) ---
                     yeni_sadece_nobet = st.checkbox(
                         "⭐ Sadece Nöbetçi Öğretmenlerden Seç (Nöbet Dışı Bırak)",
                         value=g_sadece_nobet,
                         key=f"dinamik_nobet_cb_{orig_idx}",
-                        help="İşaretliyse sadece o gün nöbetçi olanlar atanır; kaldırılarak nöbet dışı bırakılırsa diğer boş ve uygun öğretmenler de görevlendirilebilir."
+                        disabled=g_onayli,
+                        help="Onaylı kayıtlar üzerinde değişiklik yapılamaz. Değiştirmek için önce onayı kaldırın."
                     )
 
-                    if yeni_s_nobet := (yeni_sadece_nobet != g_sadece_nobet):
+                    if not g_onayli and (yeni_s_nobet := (yeni_sadece_nobet != g_sadece_nobet)):
                         st.session_state.gelmeyen_listesi.loc[orig_idx, "SadeceNobet"] = yeni_sadece_nobet
                         gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                         otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
@@ -753,71 +754,75 @@ with tab1:
                             st.markdown(
                                 f"**{saat}. Saat** | 🟢 Kendi Dersi (`{ders_durumu_str}`) | **Mevcut Atanan:** `{atanan_kisi}`")
 
-                            col_degis1, col_degis2 = st.columns([3, 1])
-                            with col_degis1:
-                                musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat, g_ogrt,
-                                                                        "", False, sadece_nobetci=False)
+                            if g_onayli:
+                                st.info(f"🔒 Bu görevlendirme onaylandığı için {saat}. saatte değişiklik yapılamaz.")
+                            else:
+                                col_degis1, col_degis2 = st.columns([3, 1])
+                                with col_degis1:
+                                    musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat,
+                                                                            g_ogrt, "", False, sadece_nobetci=False)
 
-                                ilk_secenek_metni = "Görevlendirmeyi Değiştir" if not match_atama.empty else "Atama Yapılmadı / Seçim Yap"
+                                    ilk_secenek_metni = "Görevlendirmeyi Değiştir" if not match_atama.empty else "Atama Yapılmadı / Seçim Yap"
 
-                                secenekler = [ilk_secenek_metni]
-                                aday_map = {}
-                                for aday in musait_adaylar:
-                                    ogr_adi = aday["ogretmen"]
-                                    is_nob = tr_normalize(ogr_adi) in nobetci_isimleri_clean
-                                    etiket = f"⭐ [NÖBETÇİ] {ogr_adi} ({aday['brans']})" if is_nob else f"{ogr_adi} ({aday['brans']})"
-                                    secenekler.append(etiket)
-                                    aday_map[etiket] = ogr_adi
+                                    secenekler = [ilk_secenek_metni]
+                                    aday_map = {}
+                                    for aday in musait_adaylar:
+                                        ogr_adi = aday["ogretmen"]
+                                        is_nob = tr_normalize(ogr_adi) in nobetci_isimleri_clean
+                                        etiket = f"⭐ [NÖBETÇİ] {ogr_adi} ({aday['brans']})" if is_nob else f"{ogr_adi} ({aday['brans']})"
+                                        secenekler.append(etiket)
+                                        aday_map[etiket] = ogr_adi
 
-                                secilen_manuel = st.selectbox(f"Manuel Değiştir ({saat}. Saat)", options=secenekler,
-                                                              key=f"manuel_sec_{orig_idx}_{saat}")
+                                    secilen_manuel = st.selectbox(f"Manuel Değiştir ({saat}. Saat)", options=secenekler,
+                                                                  key=f"manuel_sec_{orig_idx}_{saat}")
 
-                                if secilen_manuel != ilk_secenek_metni:
-                                    secilen_ogretmen_adi = aday_map[secilen_manuel]
-                                    ogr_satir_secilen = ogretmen_satiri_bul(df_ders, secilen_ogretmen_adi, ogrt_col)
+                                    if secilen_manuel != ilk_secenek_metni:
+                                        secilen_ogretmen_adi = aday_map[secilen_manuel]
+                                        ogr_satir_secilen = ogretmen_satiri_bul(df_ders, secilen_ogretmen_adi, ogrt_col)
 
-                                    secilen_brans_sutun = next((c for c in ogr_satir_secilen.columns if any(
-                                        k in str(c).lower() for k in ["branş", "brans", "alan", "ders"])), None)
-                                    s_brans = str(ogr_satir_secilen[secilen_brans_sutun].values[
-                                                      0]) if not ogr_satir_secilen.empty and secilen_brans_sutun and not pd.isna(
-                                        ogr_satir_secilen[secilen_brans_sutun].values[0]) else ""
+                                        secilen_brans_sutun = next((c for c in ogr_satir_secilen.columns if any(
+                                            k in str(c).lower() for k in ["branş", "brans", "alan", "ders"])), None)
+                                        s_brans = str(ogr_satir_secilen[secilen_brans_sutun].values[
+                                                          0]) if not ogr_satir_secilen.empty and secilen_brans_sutun and not pd.isna(
+                                            ogr_satir_secilen[secilen_brans_sutun].values[0]) else ""
 
-                                    hist = st.session_state.assignment_history
-                                    tarih_str = str(t1_tarih)[:10]
+                                        hist = st.session_state.assignment_history
+                                        tarih_str = str(t1_tarih)[:10]
 
-                                    mask_satir = (hist["Tarih"].astype(str).str[:10] == tarih_str) & \
-                                                 (hist["Gelmeyen Öğretmen"].apply(tr_normalize) == tr_normalize(
-                                                     g_ogrt)) & \
-                                                 (hist["Ders Saati"].astype(
-                                                     str).str.strip().str.lower() == f"{saat}. saat")
+                                        mask_satir = (hist["Tarih"].astype(str).str[:10] == tarih_str) & \
+                                                     (hist["Gelmeyen Öğretmen"].apply(tr_normalize) == tr_normalize(
+                                                         g_ogrt)) & \
+                                                     (hist["Ders Saati"].astype(
+                                                         str).str.strip().str.lower() == f"{saat}. saat")
 
-                                    if mask_satir.any():
-                                        st.session_state.assignment_history.loc[
-                                            mask_satir, "Görevlendirilen Öğretmen"] = secilen_ogretmen_adi
-                                        st.session_state.assignment_history.loc[mask_satir, "Branş"] = s_brans
-                                    else:
-                                        yeni_satir = pd.DataFrame({
-                                            "Tarih": [tarih_str], "Gün": [secilen_gun], "Ders Saati": [f"{saat}. Saat"],
-                                            "Gelmeyen Öğretmen": [g_ogrt],
-                                            "Görevlendirilen Öğretmen": [secilen_ogretmen_adi], "Branş": [s_brans]
-                                        })
-                                        st.session_state.assignment_history = pd.concat([hist, yeni_satir],
-                                                                                        ignore_index=True)
+                                        if mask_satir.any():
+                                            st.session_state.assignment_history.loc[
+                                                mask_satir, "Görevlendirilen Öğretmen"] = secilen_ogretmen_adi
+                                            st.session_state.assignment_history.loc[mask_satir, "Branş"] = s_brans
+                                        else:
+                                            yeni_satir = pd.DataFrame({
+                                                "Tarih": [tarih_str], "Gün": [secilen_gun],
+                                                "Ders Saati": [f"{saat}. Saat"],
+                                                "Gelmeyen Öğretmen": [g_ogrt],
+                                                "Görevlendirilen Öğretmen": [secilen_ogretmen_adi], "Branş": [s_brans]
+                                            })
+                                            st.session_state.assignment_history = pd.concat([hist, yeni_satir],
+                                                                                            ignore_index=True)
 
-                                    gecmisi_kaydet(st.session_state.assignment_history)
-                                    st.success(
-                                        f"✅ {saat}. saat için görevli {secilen_ogretmen_adi} olarak güncellendi ve kaydedildi!")
-                                    st.rerun()
+                                        gecmisi_kaydet(st.session_state.assignment_history)
+                                        st.success(
+                                            f"✅ {saat}. saat için görevli {secilen_ogretmen_adi} olarak güncellendi ve kaydedildi!")
+                                        st.rerun()
 
-                            with col_degis2:
-                                if not match_atama.empty and st.button("🗑️ Sil", key=f"tek_sil_{orig_idx}_{saat}",
-                                                                       use_container_width=True):
-                                    idx_to_drop = match_atama.index
-                                    st.session_state.assignment_history = st.session_state.assignment_history.drop(
-                                        idx_to_drop).reset_index(drop=True)
-                                    gecmisi_kaydet(st.session_state.assignment_history)
-                                    st.success("✅ Görev başarıyla silindi ve kaydedildi!")
-                                    st.rerun()
+                                with col_degis2:
+                                    if not match_atama.empty and st.button("🗑️ Sil", key=f"tek_sil_{orig_idx}_{saat}",
+                                                                           use_container_width=True):
+                                        idx_to_drop = match_atama.index
+                                        st.session_state.assignment_history = st.session_state.assignment_history.drop(
+                                            idx_to_drop).reset_index(drop=True)
+                                        gecmisi_kaydet(st.session_state.assignment_history)
+                                        st.success("✅ Görev başarıyla silindi ve kaydedildi!")
+                                        st.rerun()
                         else:
                             st.markdown(f"**{saat}. Saat** | 🔴 Boş Saat")
 
@@ -830,19 +835,25 @@ with tab1:
                             gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                             st.success("✅ Görevlendirme onaylandı ve kaydedildi!")
                             st.rerun()
-                        elif g_onayli and st.button("🔓 Kaldır", key=f"kaldir_{orig_idx}", use_container_width=True):
+                        elif g_onayli and st.button("🔓 Onayı Kaldır (Düzenlemeyi Aç)", key=f"kaldir_{orig_idx}",
+                                                    use_container_width=True):
                             st.session_state.gelmeyen_listesi.loc[orig_idx, "Onaylandi"] = False
                             gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
-                            st.success("✅ Onay kaldırıldı ve kaydedildi!")
+                            st.success("✅ Onay kaldırıldı, artık düzenleme yapabilirsiniz!")
                             st.rerun()
                     with c_sil:
-                        if st.button("🗑️ Kaydı Sil", key=f"sil_{orig_idx}", use_container_width=True):
-                            st.session_state.gelmeyen_listesi = st.session_state.gelmeyen_listesi.drop(
-                                orig_idx).reset_index(drop=True)
-                            gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
-                            otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
-                            st.success("✅ Kayıt silindi ve güncellendi!")
-                            st.rerun()
+                        if not g_onayli:
+                            if st.button("🗑️ Kaydı Sil", key=f"sil_{orig_idx}", use_container_width=True):
+                                st.session_state.gelmeyen_listesi = st.session_state.gelmeyen_listesi.drop(
+                                    orig_idx).reset_index(drop=True)
+                                gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
+                                otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
+                                st.success("✅ Kayıt silindi ve güncellendi!")
+                                st.rerun()
+                        else:
+                            st.markdown(
+                                "<p style='text-align:center; color:gray; font-size:12px;'>Onaylıyken silinemez</p>",
+                                unsafe_allow_html=True)
         else:
             st.info("Bu tarih için kayıtlı gelmeyen öğretmen yok.")
 
@@ -1295,7 +1306,6 @@ with tab8:
                         nobetleri_kaydet(df_n)
                         st.session_state.nobet_listesi = df_n
 
-                    # Görevlendirme geçmişi eksiksiz şekilde hem CSV'ye hem Session State'e yazılıyor
                     if "gecmis" in icerik_json:
                         df_h = pd.DataFrame(icerik_json["gecmis"])
                         gecmisi_kaydet(df_h)
