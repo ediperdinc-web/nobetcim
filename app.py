@@ -223,6 +223,11 @@ if not st.session_state.logged_in:
     * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlayın.
     * **💾 Günlük Yedekleme ve Kurtarma:** Tüm verilerinizi tek tıkla yedekleyin, olası bir durumda verilerinizi anında geri yükleyin.
     """)
+
+    st.markdown("---")
+    st.markdown(
+        "<p style='text-align: center; color: #57606a; font-size: 13px;'>Nöbetçim Sistemi © 2026 | Geliştiren: <b>Erdinç UÇAR</b></p>",
+        unsafe_allow_html=True)
     st.stop()
 
 aktif_kullanici = st.session_state.current_user
@@ -873,7 +878,7 @@ with tab1:
         else:
             st.info("Bu tarih için kayıtlı gelmeyen öğretmen yok.")
 
-    # TEBLİGAT RAPORU
+    # TEBLİGAT RAPORU (Geliştiren İmzalı)
     st.markdown("---")
     st.markdown(f"### 📄 Tebligat Raporu ve Çıktı Ekranı ({t1_tarih.strftime('%d.%m.%Y')})")
 
@@ -890,7 +895,7 @@ with tab1:
                                      f"<tr><td style='text-align: center;'>{i + 1}</td><td style='text-align: center;'>{r['Ders Saati']}</td><td>{r['Gelmeyen Öğretmen']}</td><td>{r['Görevlendirilen Öğretmen']} ({r.get('Branş', '')})</td><td></td></tr>"
                                      for i, r in tarihli_gorevler.iterrows()])
             if tum_onayli:
-                html_print = f"<html><head><meta charset='UTF-8'></head><body><h3 style='text-align:center;'>{il_bilgisi.upper()} VALİLİĞİ<br>{ilce_bilgisi.upper()} İLÇE MİLLİ EĞİTİM MÜDÜRLÜĞÜ<br>{okul_bilgisi.upper()} MÜDÜRLÜĞÜ</h3><table border='1' width='100%' style='border-collapse:collapse;' cellpadding='8'><thead><tr><th>S.No</th><th>Ders Saati</th><th>Gelmeyen Öğretmen</th><th>Görevlendirilen Öğretmen</th><th>İmza</th></tr></thead><tbody>{table_rows}</tbody></table><br><p style='float:right;'><strong>{mudur_bilgisi}</strong><br>Okul Müdürü</p></body></html>"
+                html_print = f"<html><head><meta charset='UTF-8'></head><body><h3 style='text-align:center;'>{il_bilgisi.upper()} VALİLİĞİ<br>{ilce_bilgisi.upper()} İLÇE MİLLİ EĞİTİM MÜDÜRLÜĞÜ<br>{okul_bilgisi.upper()} MÜDÜRLÜĞÜ</h3><table border='1' width='100%' style='border-collapse:collapse;' cellpadding='8'><thead><tr><th>S.No</th><th>Ders Saati</th><th>Gelmeyen Öğretmen</th><th>Görevlendirilen Öğretmen</th><th>İmza</th></tr></thead><tbody>{table_rows}</tbody></table><br><p style='float:right;'><strong>{mudur_bilgisi}</strong><br>Okul Müdürü</p><br><br><br><hr><p style='font-size: 11px; color: #777; text-align: center;'>Nöbetçim Sistemi | Geliştiren: Erdinç UÇAR</p></body></html>"
                 st.download_button("📄 Tebligat Çıktısını İndir (HTML)", data=html_print,
                                    file_name=f"Tebligat_{t1_tarih}.html", mime="text/html")
             else:
@@ -964,6 +969,16 @@ with tab3:
                     nobetleri_kaydet(st.session_state.nobet_listesi)
                     st.rerun()
 
+    st.markdown("---")
+    st.markdown(f"### 🖨️ Nöbetçi Listesi Çıktısı ({n_tarih.strftime('%d.%m.%Y')})")
+    if not gunluk_nobetciler.empty:
+        n_table_rows = "".join([
+                                   f"<tr><td style='text-align: center;'>{i + 1}</td><td>{r['Öğretmen Adı']}</td><td>{r['Nöbet Yeri']}</td><td></td></tr>"
+                                   for i, r in gunluk_nobetciler.reset_index(drop=True).iterrows()])
+        n_html_print = f"<html><head><meta charset='UTF-8'></head><body><h3 style='text-align:center;'>{il_bilgisi.upper()} VALİLİĞİ<br>{ilce_bilgisi.upper()} İLÇE MİLLİ EĞİTİM MÜDÜRLÜĞÜ<br>{okul_bilgisi.upper()} MÜDÜRLÜĞÜ<br><br>{n_tarih.strftime('%d.%m.%Y')} ({n_gun}) GÜNLÜK NÖBETÇİ ÖĞRETMENLER LİSTESİ</h3><table border='1' width='100%' style='border-collapse:collapse; margin-top:20px; font-size:14px;' cellpadding='8'><thead><tr><th>S.No</th><th>Öğretmen Adı Soyadı</th><th>Nöbet Yeri / Kat</th><th>İmza</th></tr></thead><tbody>{n_table_rows}</tbody></table><br><br><p style='float:right;'><strong>{mudur_bilgisi}</strong><br>Okul Müdürü</p><br><br><br><hr><p style='font-size: 11px; color: #777; text-align: center;'>Nöbetçim Sistemi | Geliştiren: Erdinç UÇAR</p></body></html>"
+        st.download_button("📄 Nöbetçi Listesi Çıktısını İndir (HTML)", data=n_html_print,
+                           file_name=f"Nobetci_Listesi_{n_tarih}.html", mime="text/html")
+
 # --- 4. SEKME: TOPLAM GÖREVLENDİRME ---
 with tab4:
     st.subheader("📊 Toplam Görevlendirme Sayıları")
@@ -985,13 +1000,15 @@ with tab5:
 # --- 6. SEKME: EXCEL & VERİ YÖNETİMİ (PDF DESTEKLİ) ---
 with tab6:
     st.subheader("📁 Ders Programı Yükleme (Excel veya PDF)")
-    st.write("Okulunuza ait ders programı dosyasını ister Excel (.xlsx) ister MEB/e-Okul çıkışlı PDF formatında yükleyebilirsiniz.")
+    st.write(
+        "Okulunuza ait ders programı dosyasını ister Excel (.xlsx) ister MEB/e-Okul çıkışlı PDF formatında yükleyebilirsiniz.")
 
     yuklenen_dosya = st.file_uploader("Dosya Seç (Excel veya PDF)", type=["xlsx", "xls", "pdf"])
     if yuklenen_dosya:
         dosya_uzantisi = yuklenen_dosya.name.split(".")[-1].lower()
         if dosya_uzantisi in ["xlsx", "xls"]:
-            with open(dosya_adi, "wb") as f: f.write(yuklenen_dosya.getbuffer())
+            with open(dosya_adi, "wb") as f:
+                f.write(yuklenen_dosya.getbuffer())
             st.success("✅ Excel ders programı başarıyla yüklendi!")
             st.rerun()
         elif dosya_uzantisi == "pdf":
@@ -1003,16 +1020,13 @@ with tab6:
                         if tablo:
                             tum_satirlar.extend(tablo)
                 if tum_satirlar:
-                    # Sütun ve veri uyuşmazlığını önlemek için dinamik kolon oluşturma
                     max_len = max(len(satir) for satir in tum_satirlar)
                     basliklar = [f"Kolon_{i}" for i in range(max_len)]
-
                     temiz_satirlar = []
                     for satir in tum_satirlar:
                         while len(satir) < max_len:
                             satir.append("")
                         temiz_satirlar.append(satir)
-
                     df_pdf = pd.DataFrame(temiz_satirlar[1:], columns=basliklar)
                     df_pdf.to_excel(dosya_adi, index=False)
                     st.success("✅ PDF ders programı başarıyla okundu ve Excel formatına dönüştürüldü!")
@@ -1055,3 +1069,9 @@ with tab9:
     if st.button("Gönder", type="primary"):
         if mesaj.strip():
             st.success("✅ Teşekkürler!")
+
+# --- SAYFA ALTI GENEL FOOTER ---
+st.markdown("---")
+st.markdown(
+    "<p style='text-align: center; color: #57606a; font-size: 12px;'>Nöbetçim Sistemi © 2026 | Geliştiren: <b>Erdinç UÇAR</b></p>",
+    unsafe_allow_html=True)
