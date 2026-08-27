@@ -393,9 +393,9 @@ with st.sidebar:
 
 st.title(f"🏫 {okul_bilgisi} | Nöbetçim")
 
-# --- SEKMELER (DERS PROGRAMI VE GÖREVLENDİRME OLARak Güncellendi) ---
+# --- SEKMELER (1. Sekme adı "Gelmeyen Öğretmen Ekle" olarak güncellendi) ---
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-    "📋 Ders Programı ve Görevlendirme",
+    "📋 Gelmeyen Öğretmen Ekle",
     "🛡️ Toplu Öğretmen & Nöbet",
     "📅 Günlük Nöbetçi Listesi",
     "📊 Toplam Görevlendirme",
@@ -619,9 +619,9 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
     gecmisi_kaydet(st.session_state.assignment_history)
 
 
-# --- 1. SEKME: GÖREVLENDİRME VE CANLI ÖNİZLEME (ESKİ İKİ SÜTUNLU YAPI) ---
+# --- 1. SEKME: GELMEYEN ÖĞRETMEN EKLE VE GÖREVLENDİRME ---
 with tab1:
-    st.subheader("📋 Ders Programı ve Görevlendirme")
+    st.subheader("📋 Gelmeyen Öğretmenler ve Otomatik Görevlendirme")
     col_t1, col_t2 = st.columns([2, 3])
     with col_t1:
         t1_tarih = st.date_input("İşlem Yapılacak Tarih", value=st.session_state.secilen_tarih)
