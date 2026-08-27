@@ -1102,11 +1102,24 @@ with tab5:
             st.dataframe(onizleme_df.style.map(stil_uygula), use_container_width=True, hide_index=True)
 
             st.markdown("---")
-            st.markdown(f"##### ✍️ Manuel Düzenleme ve Silme Paneli: {secilen_goruntu_ogrt}")
+            st.markdown(f"##### ✍️ Manuel Branş ve Ders Programı Düzenleme Paneli: {secilen_goruntu_ogrt}")
 
-            with st.form(f"ogretmen_duzenle_form_{idx_orig}"):
+            # 1. BRANŞ GÜNCELLEME ALANI (Tamamen Ayrı ve Güvenli)
+            with st.form(f"brans_form_{idx_orig}"):
                 yeni_brans_input = st.text_input("Öğretmen Branşı", value=mevcut_brans)
+                if st.form_submit_button("💾 Sadece Branşı Güncelle ve Kaydet", type="primary",
+                                         use_container_width=True):
+                    if brans_col in df_ders.columns:
+                        df_ders.loc[idx_orig, brans_col] = yeni_brans_input.strip()
+                        df_ders.to_excel(dosya_adi, index=False)
+                        st.success("✅ Öğretmen branşı başarıyla güncellendi ve kaydedildi!")
+                        st.rerun()
 
+            st.markdown("")
+
+            # 2. DERS PROGRAMI GÜNCELLEME ALANI
+            with st.form(f"program_form_{idx_orig}"):
+                st.markdown("##### 📅 Ders Saatleri Düzenleme Tablosu")
                 D_cols_to_edit = [c for c in gosterilecek_sutunlar if c in ogrt_satir_df.columns]
                 alt_df = ogrt_satir_df[D_cols_to_edit].copy()
 
@@ -1124,24 +1137,21 @@ with tab5:
 
                 edited_ogrt_df = st.data_editor(alt_df, hide_index=True, use_container_width=True)
 
-                c_kaydet, c_sil_ogr = st.columns(2)
-                with c_kaydet:
-                    submitted_kaydet = st.form_submit_button("💾 Değişiklikleri ve Branşı Kaydet", type="primary",
-                                                             use_container_width=True)
+                c_prg_kaydet, c_sil_ogr = st.columns(2)
+                with c_prg_kaydet:
+                    submitted_prg = st.form_submit_button("💾 Ders Programını Kaydet", type="primary",
+                                                          use_container_width=True)
                 with c_sil_ogr:
                     submitted_sil = st.form_submit_button("🗑️ Öğretmeni Sistemden Sil", use_container_width=True)
 
-                if submitted_kaydet:
-                    if brans_col in df_ders.columns:
-                        df_ders.loc[idx_orig, brans_col] = yeni_brans_input
-
+                if submitted_prg:
                     for orig_col, edited_col in zip(D_cols_to_edit, alt_df.columns):
                         if edited_col in edited_ogrt_df.columns:
                             yeni_val = str(edited_ogrt_df[edited_col].values[0])
                             df_ders.loc[idx_orig, orig_col] = yeni_val
 
                     df_ders.to_excel(dosya_adi, index=False)
-                    st.success("✅ Öğretmen ders programı ve branş bilgisi başarıyla güncellendi ve kaydedildi!")
+                    st.success("✅ Öğretmen ders programı başarıyla güncellendi ve kaydedildi!")
                     st.rerun()
 
                 if submitted_sil:
@@ -1197,7 +1207,6 @@ with tab8:
         st.markdown("#### 📥 1. Sistem Yedeğini İndir")
         st.write("Verilerinizin güncel bir kopyasını bilgisayarınıza kaydedin.")
 
-        # Ders programı Excel tablosunu da JSON yedeğinin içine dahil edelim
         ders_prog_records = []
         if os.path.exists(dosya_adi):
             try:
