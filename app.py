@@ -220,6 +220,7 @@ if not st.session_state.logged_in:
     * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alın.
     * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip edin.
     * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlayın.
+    * **💾 Günlük Yedekleme ve Kurtarma:** Tüm verilerinizi tek tıkla yedekleyin, olası bir durumda verilerinizi anında geri yükleyin.
     """)
     st.stop()
 
@@ -371,7 +372,7 @@ with st.sidebar:
 st.title(f"🏫 {okul_bilgisi} | Nöbetçim")
 
 # --- SEKMELER ---
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "📋 Ders Programı & Görevlendir",
     "🛡️ Toplu Öğretmen & Nöbet",
     "📅 Günlük Nöbetçi Listesi",
@@ -379,6 +380,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📚 Öğretmen Programları",
     "📁 Excel & Veri",
     "👤 Kurum Bilgileri",
+    "💾 Yedekleme & Kurtarma",
     "💬 Geri Bildirim"
 ])
 
@@ -1137,8 +1139,92 @@ with tab7:
             st.success("✅ Kurum bilgileri başarıyla güncellendi ve kaydedildi!")
             st.rerun()
 
-# --- 8. SEKME: GERİ BİLDİRİM & HATA BİLDİR ---
+# --- 8. SEKME: YEDEKLEME & KURTARMA ---
 with tab8:
+    st.subheader("💾 Günlük Yedekleme ve Veri Kurtarma")
+    st.write(
+        "Sisteme ait tüm verilerinizi (ders programı, nöbetler, geçmiş görevlendirmeler, muafiyetler vb.) güvenle yedekleyebilir veya daha önce aldığınız yedeği geri yükleyebilirsiniz.")
+
+    col_yedek1, col_yedek2 = st.columns(2, gap="large")
+
+    with col_yedek1:
+        st.markdown("#### 📥 1. Sistem Yedeğini İndir")
+        st.write("Verilerinizin güncel bir kopyasını bilgisayarınıza kaydedin.")
+
+        # Tüm verileri toplayıp bir JSON sözlüğünde paketleyelim
+        yedek_paketi = {
+            "aktif_kullanici": aktif_kullanici,
+            "tarih": str(datetime.datetime.now()),
+            "kurum_bilgileri": user_data,
+            "muafiyetler": muafiyetleri_yukle(),
+            "gelmeyenler": gelmeyenleri_yukle().to_dict(orient="records"),
+            "nobetler": nobetleri_yukle().to_dict(orient="records"),
+            "gecmis": gecmisi_yukle().to_dict(orient="records")
+        }
+
+        # Excel dosyasını da okuyup base64 veya doğrudan JSON içine alabiliriz ya da ayrı ayrı sunabiliriz.
+        # En pratik yol, tüm JSON verilerini paketlemektir. Ders programı Excel dosyası zaten sunucuda kayıtlıdır.
+        json_yedek_str = json.dumps(yedek_paketi, ensure_ascii=False, indent=4)
+
+        st.download_button(
+            "💾 Tüm Verileri Yedekle (JSON)",
+            data=json_yedek_str,
+            file_name=f"nobetcim_yedek_{aktif_kullanici}_{datetime.date.today()}.json",
+            mime="application/json",
+            use_container_width=True
+        )
+
+        if os.path.exists(dosya_adi):
+            with open(dosya_adi, "rb") as f:
+                st.download_button(
+                    "📊 Ders Programı Excel Dosyasını İndir",
+                    data=f,
+                    file_name=dosya_adi,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
+    with col_yedek2:
+        st.markdown("#### 📤 2. Yedekten Geri Yükle (Kurtar)")
+        st.write("Daha önce aldığınız yedek dosyasını yükleyerek verilerinizi geri getirin.")
+
+        yuklenen_yedek = st.file_uploader("Yedek Dosyası Seç (.json)", type=["json"])
+
+        if yuklenen_yedek is not None:
+            if st.button("⚠️ Yedeği Geri Yükle ve Uygula", type="primary", use_container_width=True):
+                try:
+                    icerik_json = json.load(yuklenen_yedek)
+
+                    # Muafiyetleri yükle ve kaydet
+                    if "muafiyetler" in icerik_json:
+                        muafiyetleri_kaydet(icerik_json["muafiyetler"])
+                        st.session_state.muafiyet_listesi = icerik_json["muafiyetler"]
+
+                    # Gelmeyenleri yükle ve kaydet
+                    if "gelmeyenler" in icerik_json:
+                        df_g = pd.DataFrame(icerik_json["gelmeyenler"])
+                        gelmeyenleri_kaydet(df_g)
+                        st.session_state.gelmeyen_listesi = df_g
+
+                    # Nöbetleri yükle ve kaydet
+                    if "nobetler" in icerik_json:
+                        df_n = pd.DataFrame(icerik_json["nobetler"])
+                        nobetleri_kaydet(df_n)
+                        st.session_state.nobet_listesi = df_n
+
+                    # Geçmişi yükle ve kaydet
+                    if "gecmis" in icerik_json:
+                        df_h = pd.DataFrame(icerik_json["gecmis"])
+                        gecmisi_kaydet(df_h)
+                        st.session_state.assignment_history = df_h
+
+                    st.success("✅ Yedek başarıyla geri yüklendi! Verileriniz güncellendi.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Yedek yüklenirken hata oluştu: {e}")
+
+# --- 9. SEKME: GERİ BİLDİRİM & HATA BİLDİR ---
+with tab9:
     st.subheader("💬 Geri Bildirim ve Hata Bildir")
     st.write("Sistemle ilgili görüş ve önerilerinizi iletebilirsiniz.")
 
