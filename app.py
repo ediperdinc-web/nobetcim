@@ -547,8 +547,6 @@ with tab1:
             secilen_gelmeyen_saatler = st.multiselect("Gelmeyen Ders Saatleri", options=list(range(1, 9)),
                                                       default=list(range(1, 9)))
             form_brans_onceligi = st.checkbox("🔍 Branş Önceliği Uygula", value=True, key="form_brans_cb")
-            form_disi_nobet = st.checkbox("🔍 Nöbetçi Dışı Boş Dersli Öğretmenler de Görevlendirilsin", value=False,
-                                          key="form_disi_cb")
 
             if st.form_submit_button("🚀 Kaydet ve Otomatik Görevlendir", type="primary"):
                 if secilen_anlik_ogretmen in ["Lütfen Öğretmen Seçin...", "Tüm Öğretmenler"]:
@@ -573,7 +571,6 @@ with tab1:
 
                         yeni_idx = mevcut.index[-1]
                         st.session_state[f"brans_cb_{yeni_idx}"] = form_brans_onceligi
-                        st.session_state[f"disi_cb_{yeni_idx}"] = form_disi_nobet
 
                         otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
                         st.success("Başarıyla kaydedildi ve otomatik görevlendirildi!")
@@ -593,25 +590,6 @@ with tab1:
 
                 with st.expander(f"🔴 {g_ogrt} ({g_mazeret}) {'🔒 (Onaylandı)' if g_onayli else '🔓 (Beklemede)'}",
                                  expanded=True):
-                    # Kayıtlı gelenler için de dinamik tik ekleyelim ki ayarlardan değiştirilebilsin
-                    c_b1, c_b2 = st.columns(2)
-                    with c_b1:
-                        mevcut_brans_val = st.session_state.get(f"brans_cb_{orig_idx}", True)
-                        yeni_brans_val = st.checkbox("🔍 Branş Önceliği Uygula", value=mevcut_brans_val,
-                                                     key=f"live_brans_{orig_idx}")
-                        if yeni_brans_val != mevcut_brans_val:
-                            st.session_state[f"brans_cb_{orig_idx}"] = yeni_brans_val
-                            otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
-                            st.rerun()
-                    with c_b2:
-                        mevcut_disi_val = st.session_state.get(f"disi_cb_{orig_idx}", False)
-                        yeni_disi_val = st.checkbox("🔍 Nöbetçi Dışı Da Ver", value=mevcut_disi_val,
-                                                    key=f"live_disi_{orig_idx}")
-                        if yeni_disi_val != mevcut_disi_val:
-                            st.session_state[f"disi_cb_{orig_idx}"] = yeni_disi_val
-                            otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
-                            st.rerun()
-
                     mevcut_gorevler = st.session_state.assignment_history[
                         (st.session_state.assignment_history["Tarih"].astype(str).str[:10] == str(t1_tarih)[:10]) &
                         (st.session_state.assignment_history["Gelmeyen Öğretmen"].apply(tr_normalize) == tr_normalize(
@@ -668,6 +646,7 @@ with tab1:
                                     secilen_ogretmen_adi = aday_map[secilen_manuel]
                                     ogr_satir_secilen = ogretmen_satiri_bul(df_ders, secilen_ogretmen_adi, ogrt_col)
 
+                                    # Güvenli branş tespiti
                                     secilen_brans_sutun = next((c for c in ogr_satir_secilen.columns if any(
                                         k in str(c).lower() for k in ["branş", "brans", "alan", "ders"])), None)
                                     s_brans = str(ogr_satir_secilen[secilen_brans_sutun].values[
