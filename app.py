@@ -27,12 +27,12 @@ st.markdown("""
         background-color: #f4f6f9;
     }
 
-    /* Kart Yapıları (Container Stilleri) */
+    /* Kart Yapıları */
     div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"] {
         gap: 1.5rem;
     }
 
-    /* Buton Tasarımları (Modern Hover ve Köşeler) */
+    /* Buton Tasarımları */
     div.stButton > button {
         border-radius: 10px;
         font-weight: 600;
@@ -84,12 +84,6 @@ st.markdown("""
         border-radius: 10px;
         border: 1px solid #e1e4e8;
         font-weight: 600;
-    }
-
-    /* Tablo ve Veri Izgaraları */
-    dataframe {
-        border-radius: 10px;
-        border: 1px solid #e1e4e8;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -155,6 +149,7 @@ if not st.session_state.logged_in:
             if k_adi in st.session_state.users and st.session_state.users[k_adi].get("password") == sifre:
                 st.session_state.logged_in = True
                 st.session_state.current_user = k_adi
+                st.success("Giriş başarılı, yönlendiriliyorsunuz...")
                 st.rerun()
             else:
                 st.sidebar.error("Hatalı kullanıcı adı veya şifre!")
@@ -211,7 +206,21 @@ if not st.session_state.logged_in:
                 st.error("Kayıt bulunamadı.")
 
     st.title("🏫 Nöbetçim - Okul Nöbet ve Görevlendirme Sistemi")
-    st.info("👋 Hoş geldiniz! Devam etmek için lütfen sol taraftaki panelden giriş yapın.")
+    st.info(
+        "👋 Hoş geldiniz! Devam etmek için lütfen sol taraftaki panelden giriş yapın veya hemen ücretsiz kayıt olun.")
+
+    st.markdown("---")
+    st.markdown("### 🚀 Nöbetçim Sistemi ile Neler Yapabilirsiniz?")
+    st.markdown("""
+    Bu sistem okullardaki nöbet ve ders görevlendirme süreçlerini tamamen dijitalleştirmek ve hızlandırmak için tasarlanmıştır. 
+
+    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programı Excel dosyasını yükleyerek tüm öğretmenlerin programını dijital ortamda görüntüleyin.
+    * **⚡ Otomatik Acil Görevlendirme:** Günlük olarak gelmeyen/izinli öğretmenlerin ders saatlerine, nöbetçi öğretmenler arasından en adil ve otomatik şekilde görevlendirme yapın.
+    * **📅 Günlük Nöbetçi Listesi:** Hangi gün kimin hangi katta/yerde nöbetçi olduğunu belirleyin ve bu listeyi günlük olarak tek tıkla çıktı alın.
+    * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alın.
+    * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip edin.
+    * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlayın.
+    """)
     st.stop()
 
 aktif_kullanici = st.session_state.current_user
@@ -356,6 +365,7 @@ with st.sidebar:
     if st.button("🚪 Çıkış Yap", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.current_user = ""
+        st.success("Oturum kapatıldı.")
         st.rerun()
 
 st.title(f"🏫 {okul_bilgisi} | Nöbetçim")
@@ -650,7 +660,7 @@ with tab1:
                         st.session_state[f"brans_cb_{yeni_idx}"] = form_brans_onceligi
 
                         otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
-                        st.success("Başarıyla kaydedildi ve otomatik görevlendirildi!")
+                        st.success("✅ Kayıt başarıyla eklendi ve otomatik görevlendirildi!")
                         st.rerun()
 
     with col_sag:
@@ -752,7 +762,8 @@ with tab1:
                                                                                         ignore_index=True)
 
                                     gecmisi_kaydet(st.session_state.assignment_history)
-                                    st.success(f"✅ {saat}. saat güncellendi!")
+                                    st.success(
+                                        f"✅ {saat}. saat için görevli {secilen_ogretmen_adi} olarak güncellendi ve kaydedildi!")
                                     st.rerun()
 
                             with col_degis2:
@@ -762,7 +773,7 @@ with tab1:
                                     st.session_state.assignment_history = st.session_state.assignment_history.drop(
                                         idx_to_drop).reset_index(drop=True)
                                     gecmisi_kaydet(st.session_state.assignment_history)
-                                    st.success("Görev silindi.")
+                                    st.success("✅ Görev başarıyla silindi ve kaydedildi!")
                                     st.rerun()
                         else:
                             st.markdown(f"**{saat}. Saat** | 🔴 Boş Saat")
@@ -774,11 +785,12 @@ with tab1:
                         if not g_onayli and st.button("✅ Onayla", key=f"onay_{orig_idx}", use_container_width=True):
                             st.session_state.gelmeyen_listesi.loc[orig_idx, "Onaylandi"] = True
                             gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
-                            st.success("Onaylandı!")
+                            st.success("✅ Görevlendirme onaylandı ve kaydedildi!")
                             st.rerun()
                         elif g_onayli and st.button("🔓 Kaldır", key=f"kaldir_{orig_idx}", use_container_width=True):
                             st.session_state.gelmeyen_listesi.loc[orig_idx, "Onaylandi"] = False
                             gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
+                            st.success("✅ Onay kaldırıldı ve kaydedildi!")
                             st.rerun()
                     with c_sil:
                         if st.button("🗑️ Kaydı Sil", key=f"sil_{orig_idx}", use_container_width=True):
@@ -786,7 +798,7 @@ with tab1:
                                 orig_idx).reset_index(drop=True)
                             gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
                             otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
-                            st.success("Silindi.")
+                            st.success("✅ Kayıt silindi ve güncellendi!")
                             st.rerun()
         else:
             st.info("Bu tarih için kayıtlı gelmeyen öğretmen yok.")
@@ -818,7 +830,7 @@ with tab1:
             if st.button("✅ Tümünü Toplu Olarak Onayla", type="primary"):
                 st.session_state.gelmeyen_listesi.loc[ogun_gelmeyenler_df.index, "Onaylandi"] = True
                 gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
-                st.success("Tüm görevlendirmeler onaylandı!")
+                st.success("✅ Tüm görevlendirmeler toplu olarak onaylandı ve kaydedildi!")
                 st.rerun()
 
 # --- 2. SEKME: TOPLU ÖĞRETMEN & NÖBET YÖNETİMİ ---
@@ -870,7 +882,7 @@ with tab2:
                     st.session_state.muafiyet_listesi[ogr_adi]["nobet_tutmuyor"] = not yeni_durum
 
                 muafiyetleri_kaydet(st.session_state.muafiyet_listesi)
-                st.success("✅ Nöbet muafiyet durumları başarıyla güncellendi!")
+                st.success("✅ Nöbet muafiyet durumları başarıyla kaydedildi!")
                 st.rerun()
     else:
         st.warning("⚠️ Ders programı yüklenmemiş veya öğretmen bulunamadı.")
@@ -906,7 +918,7 @@ with tab3:
                         {"Gün": [n_gun], "Nöbet Yeri": [nobet_yeri], "Öğretmen Adı": [eklenecek_nobetci]})
                     st.session_state.nobet_listesi = pd.concat([mevcut_nobetciler, yeni_n], ignore_index=True)
                     nobetleri_kaydet(st.session_state.nobet_listesi)
-                    st.success("Nöbetçi eklendi!")
+                    st.success("✅ Nöbetçi başarıyla eklendi ve kaydedildi!")
                     st.rerun()
 
     with col_n2:
@@ -931,7 +943,7 @@ with tab3:
                     if st.button("🗑️ Nöbeti Sil", key=f"sil_nobet_{idx}"):
                         st.session_state.nobet_listesi = st.session_state.nobet_listesi.drop(idx).reset_index(drop=True)
                         nobetleri_kaydet(st.session_state.nobet_listesi)
-                        st.success("Silindi.")
+                        st.success("✅ Nöbet kaydı silindi ve kaydedildi!")
                         st.rerun()
         else:
             st.info("Bu gün için eklenmiş nöbetçi yok.")
@@ -980,7 +992,7 @@ with tab4:
                                  "Branş"])
                     gecmisi_kaydet(st.session_state.assignment_history)
                     st.session_state.sifirlama_onayi = False
-                    st.success("Geçmiş sıfırlandı!")
+                    st.success("✅ Görevlendirme geçmişi başarıyla sıfırlandı ve kaydedildi!")
                     st.rerun()
             with col_onay2:
                 if st.button("Vazgeç", use_container_width=True):
@@ -1087,7 +1099,7 @@ with tab5:
                         df_ders.loc[idx_orig, orig_col] = yeni_val
 
                 df_ders.to_excel(dosya_adi, index=False)
-                st.success("✅ Program güncellendi!")
+                st.success("✅ Öğretmen ders programı ve branş bilgisi başarıyla güncellendi ve kaydedildi!")
                 st.rerun()
     else:
         st.info("Lütfen bir öğretmen seçin.")
@@ -1105,7 +1117,8 @@ with tab6:
     yuklenen = st.file_uploader("Yeni Excel Dosyası Yükle", type=["xlsx", "xls"])
     if yuklenen:
         with open(dosya_adi, "wb") as f: f.write(yuklenen.getbuffer())
-        st.success("Dosya başarıyla yüklendi! Lütfen sayfayı yenileyin.")
+        st.success("✅ Excel dosyası başarıyla yüklendi ve kaydedildi!")
+        st.rerun()
 
 # --- 7. SEKME: KURUM BİLGİLERİ ---
 with tab7:
@@ -1121,7 +1134,7 @@ with tab7:
             st.session_state.users[aktif_kullanici].update(
                 {"okul_adi": y_okul, "mudur_adi": y_mudur, "ilce": y_ilce, "il": y_il})
             kullanicilari_kaydet(st.session_state.users)
-            st.success("Kurum bilgileri güncellendi!")
+            st.success("✅ Kurum bilgileri başarıyla güncellendi ve kaydedildi!")
             st.rerun()
 
 # --- 8. SEKME: GERİ BİLDİRİM & HATA BİLDİR ---
@@ -1149,7 +1162,7 @@ with tab8:
                 st.session_state.geri_bildirim_listesi = pd.concat(
                     [st.session_state.geri_bildirim_listesi, yeni_bildirim], ignore_index=True)
                 geri_bildirimleri_kaydet(st.session_state.geri_bildirim_listesi)
-                st.success("🎉 Geri bildiriminiz iletildi!")
+                st.success("🎉 Geri bildiriminiz başarıyla iletildi ve kaydedildi!")
                 st.rerun()
 
     if aktif_kullanici == "ediperdinc":
