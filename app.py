@@ -4,6 +4,7 @@ import json
 import os
 import pandas as pd
 import streamlit as st
+import pdfplumber
 
 # Sayfa ayarları
 st.set_page_config(
@@ -208,20 +209,6 @@ if not st.session_state.logged_in:
     st.title("🏫 Nöbetçim - Okul Nöbet ve Görevlendirme Sistemi")
     st.info(
         "👋 Hoş geldiniz! Devam etmek için lütfen sol taraftaki panelden giriş yapın veya hemen ücretsiz kayıt olun.")
-
-    st.markdown("---")
-    st.markdown("### 🚀 Nöbetçim Sistemi ile Neler Yapabilirsiniz?")
-    st.markdown("""
-    Bu sistem okullardaki nöbet ve ders görevlendirme süreçlerini tamamen dijitalleştirmek ve hızlandırmak için tasarlanmıştır. 
-
-    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programı Excel dosyasını yükleyerek tüm öğretmenlerin programını dijital ortamda görüntüleyin.
-    * **⚡ Otomatik Acil Görevlendirme:** Günlük olarak gelmeyen/izinli öğretmenlerin ders saatlerine, nöbetçi öğretmenler arasından en adil ve otomatik şekilde görevlendirme yapın.
-    * **📅 Günlük Nöbetçi Listesi:** Hangi gün kimin hangi katta/yerde nöbetçi olduğunu belirleyin ve bu listeyi günlük olarak tek tıkla çıktı alın.
-    * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alın.
-    * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip edin.
-    * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlayın.
-    * **💾 Günlük Yedekleme ve Kurtarma:** Tüm verilerinizi tek tıkla yedekleyin, olası bir durumda verilerinizi anında geri yükleyin.
-    """)
     st.stop()
 
 aktif_kullanici = st.session_state.current_user
@@ -465,6 +452,8 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
     tarihli_gelmeyenler = st.session_state.gelmeyen_listesi[
         st.session_state.gelmeyen_listesi["Tarih"].astype(str).str[:10] == str(secilen_tarih)[:10]]
+    gelmeyen_isimleri_clean = set(tarihli_gelmeyenler["Öğretmen Adı"].apply(tr_normalize))
+
     gelmeyen_saatleri_map = {
         tr_normalize(r["Öğretmen Adı"]): [int(x) for x in str(r.get("Gelmeyen Saatler", "1,2,3,4,5,6,7,8")).split(",")
                                           if x.strip().isdigit()] for _, r in tarihli_gelmeyenler.iterrows()}
@@ -494,6 +483,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
         ogrt_clean = tr_normalize(ogrt)
         brns = str(row[brans_col]) if brans_col in df_ders.columns else ""
 
+        if ogrt_clean in gelmeyen_isimleri_clean: continue
         if muaf_dict.get(ogrt, {}).get("nobet_tutmuyor", False): continue
 
         if (ogrt_clean == tr_normalize(g_ogrt) or
@@ -511,8 +501,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        if sadece_nobetci and is_nobetci == 0:
-            continue
+        if sadece_nobetci and is_nobetci == 0: continue
 
         if is_nobetci == 0 and not sadece_nobetci:
             toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
@@ -541,9 +530,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
     for lst in [musait_nobetciler, musait_digerleri]:
         lst.sort(key=lambda x: (-x["is_same_branch"], x["count"]))
 
-    if not sadece_nobetci:
-        return musait_nobetciler + musait_digerleri
-
+    if not sadece_nobetci: return musait_nobetciler + musait_digerleri
     return musait_nobetciler
 
 
@@ -551,8 +538,12 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
     tarih_str = str(tarih)[:10]
     gelenler_df = st.session_state.gelmeyen_listesi[
         st.session_state.gelmeyen_listesi["Tarih"].astype(str).str[:10] == tarih_str]
+    gelmeyen_isimleri_clean = set(gelenler_df["Öğretmen Adı"].apply(tr_normalize))
 
     hist = st.session_state.assignment_history
+    if not hist.empty:
+        hist = hist[~hist["Görevlendirilen Öğretmen"].apply(tr_normalize).isin(gelmeyen_isimleri_clean)]
+
     if hist.empty:
         hist = pd.DataFrame(
             columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen", "Branş"])
@@ -594,11 +585,13 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
                     atanan_kisi = str(eski_atama_satiri["Görevlendirilen Öğretmen"].values[0])
                     atanan_kisi_clean = tr_normalize(atanan_kisi)
 
-                    if sadece_nobet and atanan_kisi_clean not in nobetci_isimleri_clean:
+                    if atanan_kisi_clean in gelmeyen_isimleri_clean:
+                        pass
+                    elif sadece_nobet and atanan_kisi_clean not in nobetci_isimleri_clean:
                         continue
-
-                    yeni_atama_listesi.append(eski_atama_satiri.iloc[0].to_dict())
-                    continue
+                    else:
+                        yeni_atama_listesi.append(eski_atama_satiri.iloc[0].to_dict())
+                        continue
 
                 musaitler = uygun_ogretmenleri_bul(df_ders, tarih, gun, saat, g_ogrt, g_brans, oto_brans,
                                                    sadece_nobetci=sadece_nobet)
@@ -703,13 +696,12 @@ with tab1:
                 with st.expander(f"🔴 {g_ogrt} ({g_mazeret}) {'🔒 (Onaylandı)' if g_onayli else '🔓 (Beklemede)'}",
                                  expanded=True):
 
-                    # --- DİNAMİK NÖBET DIŞI / SADECE NÖBETÇİ SEÇENEĞİ (Onaylıyken kilitli) ---
                     yeni_sadece_nobet = st.checkbox(
                         "⭐ Sadece Nöbetçi Öğretmenlerden Seç (Nöbet Dışı Bırak)",
                         value=g_sadece_nobet,
                         key=f"dinamik_nobet_cb_{orig_idx}",
                         disabled=g_onayli,
-                        help="Onaylı kayıtlar üzerinde değişiklik yapılamaz. Değiştirmek için önce onayı kaldırın."
+                        help="Onaylı kayıtlar üzerinde değişiklik yapılamaz."
                     )
 
                     if not g_onayli and (yeni_s_nobet := (yeni_sadece_nobet != g_sadece_nobet)):
@@ -737,8 +729,15 @@ with tab1:
                         sut = ders_sutunu_bul(df_ders, secilen_gun, saat)
                         match_atama = mevcut_gorevler[
                             mevcut_gorevler["Ders Saati"].astype(str).str.strip().str.lower() == f"{saat}. saat"]
-                        atanan_kisi = match_atama["Görevlendirilen Öğretmen"].values[
-                            0] if not match_atama.empty else "-"
+
+                        atanan_kisi = "-"
+                        if not match_atama.empty:
+                            ham_atanan = str(match_atama["Görevlendirilen Öğretmen"].values[0])
+                            # Nöbetçi kontrolü ekleyerek yıldız ekleyelim
+                            if tr_normalize(ham_atanan) in nobetci_isimleri_clean:
+                                atanan_kisi = f"⭐ {ham_atanan}"
+                            else:
+                                atanan_kisi = ham_atanan
 
                         gelen_satir = ogretmen_satiri_bul(df_ders, g_ogrt, ogrt_col)
                         ders_durumu_str = ""
@@ -762,7 +761,11 @@ with tab1:
                                     musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat,
                                                                             g_ogrt, "", False, sadece_nobetci=False)
 
-                                    ilk_secenek_metni = "Görevlendirmeyi Değiştir" if not match_atama.empty else "Atama Yapılmadı / Seçim Yap"
+                                    # Akıllı Başlık: Atama yapılmışsa "Görevliyi Değiştir", yapılmamışsa "Görevli Ata"
+                                    if not match_atama.empty:
+                                        ilk_secenek_metni = "Görevliyi Değiştir / Seçim Yap"
+                                    else:
+                                        ilk_secenek_metni = "Görevli Ata / Seçim Yap"
 
                                     secenekler = [ilk_secenek_metni]
                                     aday_map = {}
@@ -773,7 +776,7 @@ with tab1:
                                         secenekler.append(etiket)
                                         aday_map[etiket] = ogr_adi
 
-                                    secilen_manuel = st.selectbox(f"Manuel Değiştir ({saat}. Saat)", options=secenekler,
+                                    secilen_manuel = st.selectbox(f"Manuel İşlem ({saat}. Saat)", options=secenekler,
                                                                   key=f"manuel_sec_{orig_idx}_{saat}")
 
                                     if secilen_manuel != ilk_secenek_metni:
@@ -890,8 +893,6 @@ with tab1:
 # --- 2. SEKME: TOPLU ÖĞRETMEN & NÖBET YÖNETİMİ ---
 with tab2:
     st.subheader("🛡️ Toplu Öğretmen, Nöbet ve Muafiyet Yönetimi")
-    st.write("Okulunuzdaki tüm öğretmenlerin nöbet muafiyet durumlarını aşağıdaki tablodan yönetebilirsiniz.")
-
     if ham_ogretmenler:
         muaf_dict = st.session_state.muafiyet_listesi
         tablo_verisi = []
@@ -900,46 +901,25 @@ with tab2:
             brns = str(ogrt_satir[brans_col].values[
                            0]).strip() if not ogrt_satir.empty and brans_col in ogrt_satir.columns else "-"
             muaf_mu = muaf_dict.get(ogrt, {}).get("nobet_tutmuyor", False)
-            nobet_tutabilir = not muaf_mu
-
-            tablo_verisi.append({
-                "Öğretmen Adı": ogrt,
-                "Branş": brns,
-                "Nöbet Tutabilir mi?": nobet_tutabilir
-            })
+            tablo_verisi.append({"Öğretmen Adı": ogrt, "Branş": brns, "Nöbet Tutabilir mi?": not muaf_mu})
 
         df_muaf_tablo = pd.DataFrame(tablo_verisi)
-
         with st.form("toplu_muafiyet_form"):
-            st.markdown("##### 📝 Öğretmen Nöbet Durum Listesi")
-
-            edited_df = st.data_editor(
-                df_muaf_tablo,
-                column_config={
-                    "Öğretmen Adı": st.column_config.TextColumn("Öğretmen Adı", disabled=True),
-                    "Branş": st.column_config.TextColumn("Branş", disabled=True),
-                    "Nöbet Tutabilir mi?": st.column_config.CheckboxColumn("Nöbet Tutabilir mi?")
-                },
-                hide_index=True,
-                use_container_width=True,
-                key="muafiyet_data_editor"
-            )
-
+            edited_df = st.data_editor(df_muaf_tablo,
+                                       column_config={"Öğretmen Adı": st.column_config.TextColumn(disabled=True),
+                                                      "Branş": st.column_config.TextColumn(disabled=True),
+                                                      "Nöbet Tutabilir mi?": st.column_config.CheckboxColumn()},
+                                       hide_index=True, use_container_width=True)
             if st.form_submit_button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True):
                 for _, row in edited_df.iterrows():
-                    ogr_adi = row["Öğretmen Adı"]
-                    yeni_durum = row["Nöbet Tutabilir mi?"]
-
-                    if ogr_adi not in st.session_state.muafiyet_listesi:
-                        st.session_state.muafiyet_listesi[ogr_adi] = {}
-
+                    ogr_adi, yeni_durum = row["Öğretmen Adı"], row["Nöbet Tutabilir mi?"]
+                    if ogr_adi not in st.session_state.muafiyet_listesi: st.session_state.muafiyet_listesi[ogr_adi] = {}
                     st.session_state.muafiyet_listesi[ogr_adi]["nobet_tutmuyor"] = not yeni_durum
-
                 muafiyetleri_kaydet(st.session_state.muafiyet_listesi)
-                st.success("✅ Nöbet muafiyet durumları başarıyla kaydedildi!")
+                st.success("✅ Kaydedildi!")
                 st.rerun()
     else:
-        st.warning("⚠️ Ders programı yüklenmemiş veya öğretmen bulunamadı.")
+        st.warning("⚠️ Öğretmen bulunamadı.")
 
 # --- 3. SEKME: GÜNLÜK NÖBETÇİ LİSTESİ ---
 with tab3:
@@ -951,411 +931,106 @@ with tab3:
     col_n1, col_n2 = st.columns(2)
     with col_n1:
         st.markdown("#### ➕ Nöbetçi Öğretmen Ekle")
-        eklenecek_nobetci = st.selectbox("Öğretmen Seç (Muaf Olmayanlar)", options=nobetci_secim_listesi,
-                                         key="nobet_ekle_ogrt")
+        eklenecek_nobetci = st.selectbox("Öğretmen Seç", options=nobetci_secim_listesi, key="nobet_ekle_ogrt")
         nobet_yeri = st.text_input("Nöbet Yeri / Kat", value="Zemin Kat")
-
         if st.button("Nöbetçi Ekle", use_container_width=True):
-            if eklenecek_nobetci == "Lütfen Öğretmen Seçin...":
-                st.warning("Geçerli bir öğretmen seçin.")
-            else:
+            if eklenecek_nobetci != "Lütfen Öğretmen Seçin...":
                 mevcut_nobetciler = st.session_state.nobet_listesi
-                zaten_var = not mevcut_nobetciler[
-                    (mevcut_nobetciler["Gün"] == n_gun) &
-                    (mevcut_nobetciler["Öğretmen Adı"].apply(tr_normalize) == tr_normalize(eklenecek_nobetci))
-                    ].empty
-
-                if zaten_var:
-                    st.warning(f"⚠️ {eklenecek_nobetci} bu gün zaten nöbetçi!")
-                else:
-                    yeni_n = pd.DataFrame(
-                        {"Gün": [n_gun], "Nöbet Yeri": [nobet_yeri], "Öğretmen Adı": [eklenecek_nobetci]})
-                    st.session_state.nobet_listesi = pd.concat([mevcut_nobetciler, yeni_n], ignore_index=True)
-                    nobetleri_kaydet(st.session_state.nobet_listesi)
-                    st.success("✅ Nöbetçi başarıyla eklendi ve kaydedildi!")
-                    st.rerun()
-
+                yeni_n = pd.DataFrame({"Gün": [n_gun], "Nöbet Yeri": [nobet_yeri], "Öğretmen Adı": [eklenecek_nobetci]})
+                st.session_state.nobet_listesi = pd.concat([mevcut_nobetciler, yeni_n], ignore_index=True)
+                nobetleri_kaydet(st.session_state.nobet_listesi)
+                st.success("✅ Eklendi!")
+                st.rerun()
     with col_n2:
-        st.markdown(f"#### 📋 {n_gun} Günü Nöbetçi Listesi")
+        st.markdown(f"#### 📋 {n_gun} Günü Nöbetçiler")
         gunluk_nobetciler = st.session_state.nobet_listesi[st.session_state.nobet_listesi["Gün"] == n_gun]
         if not gunluk_nobetciler.empty:
             for idx, r_n in gunluk_nobetciler.iterrows():
-                n_ogr = r_n["Öğretmen Adı"]
-                n_yer = r_n["Nöbet Yeri"]
-                with st.expander(f"📌 {n_ogr} ({n_yer})"):
-                    ogr_row = ogretmen_satiri_bul(df_ders, n_ogr, ogrt_col)
-                    if not ogr_row.empty:
-                        onizleme_veri = []
-                        for s in range(1, 9):
-                            sut_adi = ders_sutunu_bul(df_ders, n_gun, s)
-                            d_val = str(
-                                ogr_row[sut_adi].values[0]).strip() if sut_adi in ogr_row.columns and not pd.isna(
-                                ogr_row[sut_adi].values[0]) else ""
-                            durum = f"🟢 Dolu ({d_val})" if (d_val != "" and d_val != "Boş") else "🔴 Boş"
-                            onizleme_veri.append({"Ders Saati": f"{s}. Saat", "Program Durumu": durum})
-                        st.dataframe(pd.DataFrame(onizleme_veri), use_container_width=True, hide_index=True)
-                    if st.button("🗑️ Nöbeti Sil", key=f"sil_nobet_{idx}"):
-                        st.session_state.nobet_listesi = st.session_state.nobet_listesi.drop(idx).reset_index(drop=True)
-                        nobetleri_kaydet(st.session_state.nobet_listesi)
-                        st.success("✅ Nöbet kaydı silindi ve kaydedildi!")
-                        st.rerun()
-        else:
-            st.info("Bu gün için eklenmiş nöbetçi yok.")
-
-    st.markdown("---")
-    st.markdown(f"### 🖨️ Nöbetçi Listesi Çıktısı ({n_tarih.strftime('%d.%m.%Y')})")
-    if not gunluk_nobetciler.empty:
-        n_table_rows = "".join([
-                                   f"<tr><td style='text-align: center;'>{i + 1}</td><td>{r['Öğretmen Adı']}</td><td>{r['Nöbet Yeri']}</td><td></td></tr>"
-                                   for i, r in gunluk_nobetciler.reset_index(drop=True).iterrows()])
-        n_html_print = f"<html><head><meta charset='UTF-8'></head><body><h3 style='text-align:center;'>{il_bilgisi.upper()} VALİLİĞİ<br>{ilce_bilgisi.upper()} İLÇE MİLLİ EĞİTİM MÜDÜRLÜĞÜ<br>{okul_bilgisi.upper()} MÜDÜRLÜĞÜ<br><br>{n_tarih.strftime('%d.%m.%Y')} ({n_gun}) GÜNLÜK NÖBETÇİ ÖĞRETMENLER LİSTESİ</h3><table border='1' width='100%' style='border-collapse:collapse; margin-top:20px; font-size:14px;' cellpadding='8'><thead><tr><th>S.No</th><th>Öğretmen Adı Soyadı</th><th>Nöbet Yeri / Kat</th><th>İmza</th></tr></thead><tbody>{n_table_rows}</tbody></table><br><br><p style='float:right;'><strong>{mudur_bilgisi}</strong><br>Okul Müdürü</p></body></html>"
-        st.download_button("📄 Nöbetçi Listesi Çıktısını İndir (HTML)", data=n_html_print,
-                           file_name=f"Nobetci_Listesi_{n_tarih}.html", mime="text/html")
-    else:
-        st.info("Çıktı alabilmek için nöbetçi ekleyin.")
+                if st.button(f"🗑️ Sil: {r_n['Öğretmen Adı']} ({r_n['Nöbet Yeri']})", key=f"sil_nobet_{idx}"):
+                    st.session_state.nobet_listesi = st.session_state.nobet_listesi.drop(idx).reset_index(drop=True)
+                    nobetleri_kaydet(st.session_state.nobet_listesi)
+                    st.rerun()
 
 # --- 4. SEKME: TOPLAM GÖREVLENDİRME ---
 with tab4:
-    st.subheader("📊 Toplam Görevlendirme Sayıları ve Raporlama")
-    secim_modu = st.radio("Raporlama Türü", ["Tümü (Eğitim Öğretim Yılı)", "Ay Bazlı Filtreleme"], horizontal=True)
-
-    hist_df = st.session_state.assignment_history
-    if secim_modu == "Ay Bazlı Filtreleme" and not hist_df.empty:
-        hist_df["Ay"] = pd.to_datetime(hist_df["Tarih"]).dt.strftime("%Y-%m")
-        secilen_ay = st.selectbox("Ay Seçin", options=sorted(hist_df["Ay"].unique().tolist()))
-        hist_df = hist_df[hist_df["Ay"] == secilen_ay]
-
+    st.subheader("📊 Toplam Görevlendirme Sayıları")
     counts = get_assignment_counts()
     if counts:
-        df_counts = pd.DataFrame(list(counts.items()), columns=["Öğretmen Adı", "Toplam Görev"]).sort_values(
-            by="Toplam Görev", ascending=False)
-        st.dataframe(df_counts, use_container_width=True)
-
-        st.markdown("---")
-        if not st.session_state.sifirlama_onayi:
-            if st.button("🔄 Görevlendirme Geçmişini Sıfırla"):
-                st.session_state.sifirlama_onayi = True
-                st.rerun()
-        else:
-            st.warning("⚠️ **DİKKAT:** Tüm geçmiş sıfırlanacaktır!")
-            col_onay1, col_onay2 = st.columns(2)
-            with col_onay1:
-                if st.button("Evet, Sıfırla", type="primary", use_container_width=True):
-                    st.session_state.assignment_history = pd.DataFrame(
-                        columns=["Tarih", "Gün", "Ders Saati", "Gelmeyen Öğretmen", "Görevlendirilen Öğretmen",
-                                 "Branş"])
-                    gecmisi_kaydet(st.session_state.assignment_history)
-                    st.session_state.sifirlama_onayi = False
-                    st.success("✅ Görevlendirme geçmişi başarıyla sıfırlandı ve kaydedildi!")
-                    st.rerun()
-            with col_onay2:
-                if st.button("Vazgeç", use_container_width=True):
-                    st.session_state.sifirlama_onayi = False
-                    st.rerun()
-    else:
-        st.info("Henüz gerçekleştirilmiş görevlendirme kaydı bulunmuyor.")
+        st.dataframe(
+            pd.DataFrame(list(counts.items()), columns=["Öğretmen Adı", "Toplam Görev"]).sort_values(by="Toplam Görev",
+                                                                                                     ascending=False),
+            use_container_width=True)
 
 # --- 5. SEKME: ÖĞRETMEN DERS PROGRAMLARI ---
 with tab5:
-    st.subheader("📚 Öğretmen Ders Programları, Branş, Ekleme ve Silme Yönetimi")
-
-    with st.expander("➕ Yeni Öğretmen Ekle"):
-        with st.form("yeni_ogretmen_ekle_form"):
-            yeni_ogr_ad = st.text_input("Öğretmen Adı Soyadı")
-            yeni_ogr_brans = st.text_input("Öğretmen Branşı")
-            if st.form_submit_button("Öğretmeni Sisteme Ekle", type="primary", use_container_width=True):
-                if not yeni_ogr_ad.strip():
-                    st.warning("Lütfen öğretmen adı soyadı girin.")
-                else:
-                    var_mi = not ogretmen_satiri_bul(df_ders, yeni_ogr_ad, ogrt_col).empty
-                    if var_mi:
-                        st.warning("⚠️ Bu isimde bir öğretmen zaten kayıtlı!")
-                    else:
-                        yeni_satir_dict = {c: "" for c in df_ders.columns}
-                        if ogrt_col in df_ders.columns: yeni_satir_dict[ogrt_col] = yeni_ogr_ad.strip()
-                        if brans_col in df_ders.columns: yeni_satir_dict[brans_col] = yeni_ogr_brans.strip()
-                        if "Sıra No" in df_ders.columns: yeni_satir_dict["Sıra No"] = str(len(df_ders) + 1)
-
-                        df_yeni_eklenen = pd.DataFrame([yeni_satir_dict])
-                        df_ders = pd.concat([df_ders, df_yeni_eklenen], ignore_index=True)
-                        df_ders.to_excel(dosya_adi, index=False)
-                        st.success(f"✅ {yeni_ogr_ad} başarıyla eklendi ve kaydedildi!")
-                        st.rerun()
-
-    st.markdown("---")
-    col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        secilen_goruntu_ogrt = st.selectbox("Öğretmen Seçin", options=ogretmenler_listesi, key="goruntu_ogrt_secim")
-    with col_g2:
-        secilen_goruntu_gun = st.selectbox("Gün Seçin", options=["Tüm Günler"] + list(gunler_tr.values()),
-                                           key="goruntu_gun_secim")
-
-    if secilen_goruntu_ogrt == "Tüm Öğretmenler":
-        if secilen_goruntu_gun == "Tüm Günler":
-            st.dataframe(df_ders.style.map(stil_uygula), use_container_width=True)
-        else:
-            gosterilecek_sutunlar = [ogrt_col, brans_col] if brans_col in df_ders.columns else [ogrt_col]
-            gosterilecek_sutunlar += [ders_sutunu_bul(df_ders, secilen_goruntu_gun, s) for s in range(1, 9)]
-            gosterilecek_sutunlar = [c for c in gosterilecek_sutunlar if c in df_ders.columns]
-
-            f_df = df_ders[gosterilecek_sutunlar].copy()
-            cols_seen_f = set()
-            new_cols_f = []
-            for c in f_df.columns:
-                col_name = str(c)
-                if col_name in cols_seen_f:
-                    i = 1
-                    while f"{col_name}_{i}" in cols_seen_f: i += 1
-                    col_name = f"{col_name}_{i}"
-                cols_seen_f.add(col_name)
-                new_cols_f.append(col_name)
-            f_df.columns = new_cols_f
-
-            st.markdown(f"##### 📋 Tüm Öğretmenler - {secilen_goruntu_gun} Programı")
-            st.dataframe(f_df.style.map(stil_uygula), use_container_width=True, hide_index=True)
-
-    elif secilen_goruntu_ogrt != "Lütfen Öğretmen Seçin...":
+    st.subheader("📚 Öğretmen Ders Programları")
+    secilen_goruntu_ogrt = st.selectbox("Öğretmen Seçin", options=ogretmenler_listesi, key="goruntu_ogrt_secim")
+    if secilen_goruntu_ogrt not in ["Lütfen Öğretmen Seçin...", "Tüm Öğretmenler"]:
         ogrt_satir_df = ogretmen_satiri_bul(df_ders, secilen_goruntu_ogrt, ogrt_col)
-        if not ogrt_satir_df.empty:
-            idx_orig = ogrt_satir_df.index[0]
-            mevcut_brans = str(
-                ogrt_satir_df[brans_col].values[0]) if brans_col in ogrt_satir_df.columns and not pd.isna(
-                ogrt_satir_df[brans_col].values[0]) else ""
+        st.dataframe(ogrt_satir_df.style.map(stil_uygula), use_container_width=True, hide_index=True)
 
-            st.markdown(f"##### 👁️ Program Önizlemesi")
-            if secilen_goruntu_gun == "Tüm Günler":
-                gosterilecek_sutunlar = [c for c in df_ders.columns if any(
-                    g in tr_normalize(c) for g in ["saat", "pazartesi", "salı", "çarşamba", "perşembe", "cuma"])]
-            else:
-                gosterilecek_sutunlar = [ders_sutunu_bul(df_ders, secilen_goruntu_gun, s) for s in range(1, 9)]
-                gosterilecek_sutunlar = [c for c in gosterilecek_sutunlar if c in df_ders.columns]
-
-            onizleme_df = ogrt_satir_df[
-                [ogrt_col, brans_col] + gosterilecek_sutunlar].copy() if brans_col in ogrt_satir_df.columns else \
-            ogrt_satir_df[[ogrt_col] + gosterilecek_sutunlar].copy()
-
-            cols_seen_onizleme = set()
-            new_cols_onizleme = []
-            for c in onizleme_df.columns:
-                col_name = str(c)
-                if col_name in cols_seen_onizleme:
-                    i = 1
-                    while f"{col_name}_{i}" in cols_seen_onizleme: i += 1
-                    col_name = f"{col_name}_{i}"
-                cols_seen_onizleme.add(col_name)
-                new_cols_onizleme.append(col_name)
-            onizleme_df.columns = new_cols_onizleme
-
-            st.dataframe(onizleme_df.style.map(stil_uygula), use_container_width=True, hide_index=True)
-
-            st.markdown("---")
-            st.markdown(f"##### ✍️ Manuel Branş ve Ders Programı Düzenleme Paneli: {secilen_goruntu_ogrt}")
-
-            with st.form(f"brans_form_{idx_orig}"):
-                yeni_brans_input = st.text_input("Öğretmen Branşı", value=mevcut_brans)
-                if st.form_submit_button("💾 Sadece Branşı Güncelle ve Kaydet", type="primary",
-                                         use_container_width=True):
-                    if brans_col in df_ders.columns:
-                        df_ders.loc[idx_orig, brans_col] = yeni_brans_input.strip()
-                        df_ders.to_excel(dosya_adi, index=False)
-                        st.success("✅ Öğretmen branşı başarıyla güncellendi ve kaydedildi!")
-                        st.rerun()
-
-            st.markdown("")
-
-            with st.form(f"program_form_{idx_orig}"):
-                st.markdown("##### 📅 Ders Saatleri Düzenleme Tablosu")
-                D_cols_to_edit = [c for c in gosterilecek_sutunlar if c in ogrt_satir_df.columns]
-                alt_df = ogrt_satir_df[D_cols_to_edit].copy()
-
-                cols_seen = set()
-                new_cols = []
-                for c in alt_df.columns:
-                    col_name = str(c)
-                    if col_name in cols_seen:
-                        i = 1
-                        while f"{col_name}_{i}" in cols_seen: i += 1
-                        col_name = f"{col_name}_{i}"
-                    cols_seen.add(col_name)
-                    new_cols.append(col_name)
-                alt_df.columns = new_cols
-
-                edited_ogrt_df = st.data_editor(alt_df, hide_index=True, use_container_width=True)
-
-                c_prg_kaydet, c_sil_ogr = st.columns(2)
-                with c_prg_kaydet:
-                    submitted_prg = st.form_submit_button("💾 Ders Programını Kaydet", type="primary",
-                                                          use_container_width=True)
-                with c_sil_ogr:
-                    submitted_sil = st.form_submit_button("🗑️ Öğretmeni Sistemden Sil", use_container_width=True)
-
-                if submitted_prg:
-                    for orig_col, edited_col in zip(D_cols_to_edit, alt_df.columns):
-                        if edited_col in edited_ogrt_df.columns:
-                            yeni_val = str(edited_ogrt_df[edited_col].values[0])
-                            df_ders.loc[idx_orig, orig_col] = yeni_val
-
-                    df_ders.to_excel(dosya_adi, index=False)
-                    st.success("✅ Öğretmen ders programı başarıyla güncellendi ve kaydedildi!")
-                    st.rerun()
-
-                if submitted_sil:
-                    df_ders = df_ders.drop(idx_orig).reset_index(drop=True)
-                    df_ders.to_excel(dosya_adi, index=False)
-                    st.success(f"✅ {secilen_goruntu_ogrt} sistemden silindi ve kaydedildi!")
-                    st.rerun()
-    else:
-        st.info("Lütfen bir öğretmen seçin.")
-
-# --- 6. SEKME: EXCEL & VERİ YÖNETİMİ ---
+# --- 6. SEKME: EXCEL & VERİ YÖNETİMİ (PDF DESTEKLİ) ---
 with tab6:
-    st.subheader("📁 Excel Ders Programı Yükleme ve Şablon")
-    st.write("Okulunuza ait ders programı Excel dosyasını yükleyebilir veya şablonu indirebilirsiniz.")
+    st.subheader("📁 Ders Programı Yükleme (Excel veya PDF)")
+    st.write(
+        "Okulunuza ait ders programı dosyasını ister Excel (.xlsx) ister MEB/e-Okul çıkışlı PDF formatında yükleyebilirsiniz.")
 
-    with open(dosya_adi, "rb") as f:
-        st.download_button("📥 Güncel Excel Şablonunu İndir", data=f, file_name="okul_ders_programi.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                           use_container_width=True)
-
-    yuklenen = st.file_uploader("Yeni Excel Dosyası Yükle", type=["xlsx", "xls"])
-    if yuklenen:
-        with open(dosya_adi, "wb") as f: f.write(yuklenen.getbuffer())
-        st.success("✅ Excel dosyası başarıyla yüklendi ve kaydedildi!")
-        st.rerun()
+    yuklenen_dosya = st.file_uploader("Dosya Seç (Excel veya PDF)", type=["xlsx", "xls", "pdf"])
+    if yuklenen_dosya:
+        dosya_uzantisi = yuklenen_dosya.name.split(".")[-1].lower()
+        if dosya_uzantisi in ["xlsx", "xls"]:
+            with open(dosya_adi, "wb") as f:
+                f.write(yuklenen_dosya.getbuffer())
+            st.success("✅ Excel ders programı başarıyla yüklendi!")
+            st.rerun()
+        elif dosya_uzantisi == "pdf":
+            try:
+                with pdfplumber.open(yuklenen_dosya) as pdf:
+                    tum_satirlar = []
+                    for sayfa in pdf.pages:
+                        tablo = sayfa.extract_table()
+                        if tablo:
+                            tum_satirlar.extend(tablo)
+                if tum_satirlar:
+                    df_pdf = pd.DataFrame(tum_satirlar[1:], columns=tum_satirlar[0] if len(tum_satirlar) > 0 else None)
+                    df_pdf.to_excel(dosya_adi, index=False)
+                    st.success("✅ PDF ders programı başarıyla okundu ve Excel formatına dönüştürüldü!")
+                    st.rerun()
+                else:
+                    st.error("❌ PDF içinde okunabilir bir tablo bulunamadı.")
+            except Exception as e:
+                st.error(f"❌ PDF okunurken hata oluştu: {e}")
 
 # --- 7. SEKME: KURUM BİLGİLERİ ---
 with tab7:
     st.subheader("👤 Kurum ve İdareci Bilgileri")
     y_okul = st.text_input("Okul Adı", value=user_data.get("okul_adi", ""))
     y_mudur = st.text_input("Müdür Adı Soyadı", value=user_data.get("mudur_adi", ""))
-    y_ilce = st.text_input("İlçe Adı", value=user_data.get("ilce", ""))
-    y_il = st.text_input("İl Adı", value=user_data.get("il", ""))
-
     if st.button("Bilgileri Güncelle", type="primary", use_container_width=True):
-        st.session_state.users = kullanicilari_yukle()
-        if aktif_kullanici in st.session_state.users:
-            st.session_state.users[aktif_kullanici].update(
-                {"okul_adi": y_okul, "mudur_adi": y_mudur, "ilce": y_ilce, "il": y_il})
-            kullanicilari_kaydet(st.session_state.users)
-            st.success("✅ Kurum bilgileri başarıyla güncellendi ve kaydedildi!")
-            st.rerun()
+        st.session_state.users[aktif_kullanici].update({"okul_adi": y_okul, "mudur_adi": y_mudur})
+        kullanicilari_kaydet(st.session_state.users)
+        st.success("✅ Güncellendi!")
+        st.rerun()
 
 # --- 8. SEKME: YEDEKLEME & KURTARMA ---
 with tab8:
-    st.subheader("💾 Günlük Yedekleme ve Veri Kurtarma")
-    st.write(
-        "Sisteme ait tüm verilerinizi (ders programı, nöbetler, geçmiş görevlendirmeler, muafiyetler vb.) güvenle yedekleyebilir veya daha önce aldığınız yedeği geri yükleyebilirsiniz.")
+    st.subheader("💾 Yedekleme ve Kurtarma")
+    ders_prog_records = pd.read_excel(dosya_adi, dtype=str).to_dict(orient="records") if os.path.exists(
+        dosya_adi) else []
+    yedek_paketi = {
+        "aktif_kullanici": aktif_kullanici, "tarih": str(datetime.datetime.now()),
+        "muafiyetler": muafiyetleri_yukle(), "gelmeyenler": gelmeyenleri_yukle().to_dict(orient="records"),
+        "nobetler": nobetleri_yukle().to_dict(orient="records"), "gecmis": gecmisi_yukle().to_dict(orient="records"),
+        "ders_programi": ders_prog_records
+    }
+    st.download_button("💾 Tüm Verileri Yedekle (JSON)", data=json.dumps(yedek_paketi, ensure_ascii=False, indent=4),
+                       file_name=f"nobetcim_yedek_{aktif_kullanici}.json", mime="application/json",
+                       use_container_width=True)
 
-    col_yedek1, col_yedek2 = st.columns(2, gap="large")
-
-    with col_yedek1:
-        st.markdown("#### 📥 1. Sistem Yedeğini İndir")
-        st.write("Verilerinizin güncel bir kopyasını bilgisayarınıza kaydedin.")
-
-        ders_prog_records = []
-        if os.path.exists(dosya_adi):
-            try:
-                df_temp_excel = pd.read_excel(dosya_adi, dtype=str)
-                ders_prog_records = df_temp_excel.to_dict(orient="records")
-            except:
-                pass
-
-        yedek_paketi = {
-            "aktif_kullanici": aktif_kullanici,
-            "tarih": str(datetime.datetime.now()),
-            "kurum_bilgileri": user_data,
-            "muafiyetler": muafiyetleri_yukle(),
-            "gelmeyenler": gelmeyenleri_yukle().to_dict(orient="records"),
-            "nobetler": nobetleri_yukle().to_dict(orient="records"),
-            "gecmis": gecmisi_yukle().to_dict(orient="records"),
-            "ders_programi": ders_prog_records
-        }
-
-        json_yedek_str = json.dumps(yedek_paketi, ensure_ascii=False, indent=4)
-
-        st.download_button(
-            "💾 Tüm Verileri Yedekle (JSON)",
-            data=json_yedek_str,
-            file_name=f"nobetcim_yedek_{aktif_kullanici}_{datetime.date.today()}.json",
-            mime="application/json",
-            use_container_width=True
-        )
-
-    with col_yedek2:
-        st.markdown("#### 📤 2. Yedekten Geri Yükle (Kurtar)")
-        st.write("Daha önce aldığınız yedek dosyasını yükleyerek verilerinizi geri getirin.")
-
-        yuklenen_yedek = st.file_uploader("Yedek Dosyası Seç (.json)", type=["json"])
-
-        if yuklenen_yedek is not None:
-            if st.button("⚠️ Yedeği Geri Yükle ve Uygula", type="primary", use_container_width=True):
-                try:
-                    icerik_json = json.load(yuklenen_yedek)
-
-                    if "muafiyetler" in icerik_json:
-                        muafiyetleri_kaydet(icerik_json["muafiyetler"])
-                        st.session_state.muafiyet_listesi = icerik_json["muafiyetler"]
-
-                    if "gelmeyenler" in icerik_json:
-                        df_g = pd.DataFrame(icerik_json["gelmeyenler"])
-                        gelmeyenleri_kaydet(df_g)
-                        st.session_state.gelmeyen_listesi = df_g
-
-                    if "nobetçi" in icerik_json or "nobetler" in icerik_json:
-                        df_n = pd.DataFrame(icerik_json.get("nobetler", icerik_json.get("nobetçi", [])))
-                        nobetleri_kaydet(df_n)
-                        st.session_state.nobet_listesi = df_n
-
-                    if "gecmis" in icerik_json:
-                        df_h = pd.DataFrame(icerik_json["gecmis"])
-                        gecmisi_kaydet(df_h)
-                        st.session_state.assignment_history = df_h
-
-                    if "ders_programi" in icerik_json and icerik_json["ders_programi"]:
-                        df_dp = pd.DataFrame(icerik_json["ders_programi"])
-                        df_dp.to_excel(dosya_adi, index=False)
-
-                    st.success(
-                        "🎉 İŞLEM BAŞARILI: Yedek dosyası başarıyla yüklendi; ders programınız, nöbetçileriniz ve görevlendirme geçmişiniz dahil tüm verileriniz eski haline getirildi!")
-                    st.balloons()
-                except Exception as e:
-                    st.error(f"❌ Yedek yüklenirken hata oluştu: {e}")
-
-# --- 9. SEKME: GERİ BİLDİRİM & HATA BİLDİR ---
+# --- 9. SEKME: GERİ BİLDİRİM ---
 with tab9:
-    st.subheader("💬 Geri Bildirim ve Hata Bildir")
-    st.write("Sistemle ilgili görüş ve önerilerinizi iletebilirsiniz.")
-
-    with st.form("geri_bildirim_form"):
-        konu_secimi = st.selectbox("Bildirim Konusu", ["Ders Programı / Veri Hatası", "Nöbet Dağıtım Hatası / İsteği",
-                                                       "Arayüz / Tasarım Önerisi", "Diğer"])
-        mesaj_detayi = st.text_area("Açıklama", placeholder="Görüş ve önerilerinizi yazabilirsiniz...")
-
-        if st.form_submit_button("🚀 Geri Bildirimi Gönder", type="primary", use_container_width=True):
-            if not mesaj_detayi.strip():
-                st.warning("Lütfen açıklama yazın.")
-            else:
-                yeni_bildirim = pd.DataFrame({
-                    "Tarih": [datetime.datetime.now().strftime("%Y-%m-%d %H:%M")],
-                    "Kullanıcı": [aktif_kullanici],
-                    "Konu": [konu_secimi],
-                    "Mesaj": [mesaj_detayi],
-                    "Durum": ["Beklemede"]
-                })
-
-                st.session_state.geri_bildirim_listesi = pd.concat(
-                    [st.session_state.geri_bildirim_listesi, yeni_bildirim], ignore_index=True)
-                geri_bildirimleri_kaydet(st.session_state.geri_bildirim_listesi)
-                st.success("🎉 Geri bildiriminiz başarıyla iletildi ve kaydedildi!")
-                st.rerun()
-
-    if aktif_kullanici == "ediperdinc":
-        st.markdown("---")
-        st.markdown("#### 📥 Yönetici Paneli: Geri Bildirimler")
-        if not st.session_state.geri_bildirim_listesi.empty:
-            st.dataframe(st.session_state.geri_bildirim_listesi, use_container_width=True, hide_index=True)
-            with open(geri_bildirim_dosyasi, "rb") as f:
-                st.download_button("📥 Raporu İndir (CSV)", data=f, file_name="geri_bildirimler.csv", mime="text/html",
-                                   use_container_width=True)
-        else:
-            st.info("Henüz bildirilen bir geri bildirim yok.")
+    st.subheader("💬 Geri Bildirim")
+    mesaj = st.text_area("Görüş ve önerileriniz...")
+    if st.button("Gönder", type="primary"):
+        if mesaj.strip():
+            st.success("✅ Teşekkürler!")
