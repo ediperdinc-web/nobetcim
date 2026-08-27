@@ -657,10 +657,6 @@ with tab1:
             secilen_mazeret = st.selectbox("Mazeret", ["Raporlu", "Görevli izinli", "İzinli", "Sevkli"])
             secilen_gelmeyen_saatler = st.multiselect("Gelmeyen Ders Saatleri", options=list(range(1, 9)),
                                                       default=list(range(1, 9)))
-
-            # NÖBET DIŞI VE BRANŞ SEÇENEKLERİ EKLENDİ
-            form_sadece_nobet = st.checkbox("⭐ Sadece Nöbetçi Öğretmenlerden Seç (Nöbet Dışı Bırak)", value=True,
-                                            help="İşaretlenirse sadece o gün nöbetçi olan öğretmenler görevlendirilir.")
             form_brans_onceligi = st.checkbox("🔍 Branş Önceliği Uygula", value=True)
 
             if st.form_submit_button("🚀 Kaydet ve Otomatik Görevlendir", type="primary", use_container_width=True):
@@ -680,7 +676,7 @@ with tab1:
                         yeni = pd.DataFrame({
                             "Tarih": [str(t1_tarih)], "Gün": [secilen_gun], "Öğretmen Adı": [secilen_anlik_ogretmen],
                             "Gelmeyen Saatler": [saatler_str], "Mazeret": [secilen_mazeret], "Onaylandi": [False],
-                            "SadeceNobet": [form_sadece_nobet], "BransOnceligi": [form_brans_onceligi]
+                            "SadeceNobet": [True], "BransOnceligi": [form_brans_onceligi]
                         })
                         mevcut = pd.concat([mevcut, yeni], ignore_index=True)
                         st.session_state.gelmeyen_listesi = mevcut
@@ -699,11 +695,28 @@ with tab1:
             for orig_idx, row_g in ogun_gelmeyenler_df.iterrows():
                 g_ogrt, g_mazeret, g_onayli = row_g["Öğretmen Adı"], row_g.get("Mazeret", "İzinli"), bool(
                     row_g.get("Onaylandi", False))
-                g_saatler = [int(x) for x in str(row_g.get("Gelmeyen Saatler", "1,2,3,4,5,6,7,8")).split(",") if
-                             x.strip().isdigit()]
+                g_sadece_nobet = bool(row_g.get("SadeceNobet", True))
 
                 with st.expander(f"🔴 {g_ogrt} ({g_mazeret}) {'🔒 (Onaylandı)' if g_onayli else '🔓 (Beklemede)'}",
                                  expanded=True):
+
+                    # --- DİNAMİK NÖBET DIŞI / SADECE NÖBETÇİ SEÇENEĞİ ---
+                    yeni_sadece_nobet = st.checkbox(
+                        "⭐ Sadece Nöbetçi Öğretmenlerden Seç (Nöbet Dışı Bırak)",
+                        value=g_sadece_nobet,
+                        key=f"dinamik_nobet_cb_{orig_idx}",
+                        help="İşaretliyse sadece o gün nöbetçi olanlar atanır; kaldırılarak nöbet dışı bırakılırsa diğer boş ve uygun öğretmenler de görevlendirilebilir."
+                    )
+
+                    if yeni_s_nobet := (yeni_sadece_nobet != g_sadece_nobet):
+                        st.session_state.gelmeyen_listesi.loc[orig_idx, "SadeceNobet"] = yeni_sadece_nobet
+                        gelmeyenleri_kaydet(st.session_state.gelmeyen_listesi)
+                        otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
+                        st.success("✅ Tercih güncellendi ve görevlendirmeler yeniden hesaplandı!")
+                        st.rerun()
+
+                    st.markdown("---")
+
                     mevcut_gorevler = st.session_state.assignment_history[
                         (st.session_state.assignment_history["Tarih"].astype(str).str[:10] == str(t1_tarih)[:10]) &
                         (st.session_state.assignment_history["Gelmeyen Öğretmen"].apply(tr_normalize) == tr_normalize(
