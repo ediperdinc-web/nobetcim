@@ -393,7 +393,7 @@ with st.sidebar:
 
 st.title(f"🏫 {okul_bilgisi} | Nöbetçim")
 
-# --- SEKMELER (1. Sekme adı "Gelmeyen Öğretmen Ekle" olarak güncellendi) ---
+# --- SEKMELER ---
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "📋 Gelmeyen Öğretmen Ekle",
     "🛡️ Toplu Öğretmen & Nöbet",
@@ -1295,6 +1295,7 @@ with tab8:
                         nobetleri_kaydet(df_n)
                         st.session_state.nobet_listesi = df_n
 
+                    # Görevlendirme geçmişi eksiksiz şekilde hem CSV'ye hem Session State'e yazılıyor
                     if "gecmis" in icerik_json:
                         df_h = pd.DataFrame(icerik_json["gecmis"])
                         gecmisi_kaydet(df_h)
@@ -1305,7 +1306,7 @@ with tab8:
                         df_dp.to_excel(dosya_adi, index=False)
 
                     st.success(
-                        "🎉 İŞLEM BAŞARILI: Yedek dosyası başarıyla yüklendi, ders programınız ve tüm sistem verileriniz eski haline getirildi!")
+                        "🎉 İŞLEM BAŞARILI: Yedek dosyası başarıyla yüklendi; ders programınız, nöbetçileriniz ve görevlendirme geçmişiniz dahil tüm verileriniz eski haline getirildi!")
                     st.balloons()
                 except Exception as e:
                     st.error(f"❌ Yedek yüklenirken hata oluştu: {e}")
