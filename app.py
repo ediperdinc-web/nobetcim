@@ -208,6 +208,20 @@ if not st.session_state.logged_in:
     st.title("🏫 Nöbetçim - Okul Nöbet ve Görevlendirme Sistemi")
     st.info(
         "👋 Hoş geldiniz! Devam etmek için lütfen sol taraftaki panelden giriş yapın veya hemen ücretsiz kayıt olun.")
+
+    st.markdown("---")
+    st.markdown("### 🚀 Nöbetçim Sistemi ile Neler Yapabilirsiniz?")
+    st.markdown("""
+    Bu sistem okullardaki nöbet ve ders görevlendirme süreçlerini tamamen dijitalleştirmek ve hızlandırmak için tasarlanmıştır. 
+
+    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programı Excel dosyasını yükleyerek tüm öğretmenlerin programını dijital ortamda görüntüleyin.
+    * **⚡ Otomatik Acil Görevlendirme:** Günlük olarak gelmeyen/izinli öğretmenlerin ders saatlerine, nöbetçi öğretmenler arasından en adil ve otomatik şekilde görevlendirme yapın.
+    * **📅 Günlük Nöbetçi Listesi:** Hangi gün kimin hangi katta/yerde nöbetçi olduğunu belirleyin ve bu listeyi günlük olarak tek tıkla çıktı alın.
+    * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alın.
+    * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip edin.
+    * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlayın.
+    * **💾 Günlük Yedekleme ve Kurtarma:** Tüm verilerinizi tek tıkla yedekleyin, olası bir durumda verilerinizi anında geri yükleyin.
+    """)
     st.stop()
 
 aktif_kullanici = st.session_state.current_user
@@ -283,10 +297,14 @@ def gelmeyenleri_yukle():
                 if "Gelmeyen Saatler" not in df.columns: df["Gelmeyen Saatler"] = "1,2,3,4,5,6,7,8"
                 if "Mazeret" not in df.columns: df["Mazeret"] = "İzinli"
                 if "Onaylandi" not in df.columns: df["Onaylandi"] = False
+                if "SadeceNobet" not in df.columns: df["SadeceNobet"] = True
+                if "BransOnceligi" not in df.columns: df["BransOnceligi"] = True
                 return df
         except Exception:
             pass
-    return pd.DataFrame(columns=["Tarih", "Gün", "Öğretmen Adı", "Gelmeyen Saatler", "Mazeret", "Onaylandi"])
+    return pd.DataFrame(
+        columns=["Tarih", "Gün", "Öğretmen Adı", "Gelmeyen Saatler", "Mazeret", "Onaylandi", "SadeceNobet",
+                 "BransOnceligi"])
 
 
 def gelmeyenleri_kaydet(df): df.to_csv(gelmeyen_dosyasi, index=False)
@@ -493,7 +511,11 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
 
         is_nobetci = 1 if ogrt_clean in nobetci_isimleri else 0
 
-        if is_nobetci == 0 and sadece_nobetci:
+        # KATI KONTROL: Sadece nöbetçi isteniyorsa ve öğretmen nöbetçi değilse kesinlikle atlama!
+        if sadece_nobetci and is_nobetci == 0:
+            continue
+
+        if is_nobetci == 0 and not sadece_nobetci:
             toplam_ders = ogretmen_gunluk_toplam_ders_sayisi(df_ders, ogrt_tum_satir, secilen_gun)
             if toplam_ders < 1: continue
 
@@ -523,10 +545,7 @@ def uygun_ogretmenleri_bul(df_ders, secilen_tarih, secilen_gun, saat, g_ogrt, g_
     if not sadece_nobetci:
         return musait_nobetciler + musait_digerleri
 
-    if musait_nobetciler:
-        return musait_nobetciler
-    else:
-        return musait_digerleri
+    return musait_nobetciler
 
 
 def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
@@ -559,9 +578,8 @@ def otomatik_gorevlendirmeleri_guncelle(tarih, gun):
         gelen_row = ogretmen_satiri_bul(df_ders, g_ogrt, ogrt_col)
         g_brans = str(gelen_row[brans_col].values[0]) if not gelen_row.empty and brans_col in gelen_row.columns else ""
 
-        orig_idx = grow.name
-        sadece_nobet = not st.session_state.get(f"disi_cb_{orig_idx}", False)
-        oto_brans = st.session_state.get(f"brans_cb_{orig_idx}", True)
+        sadece_nobet = bool(grow.get("SadeceNobet", True))
+        oto_brans = bool(grow.get("BransOnceligi", True))
 
         for saat in g_saatler:
             hedef_sutun = ders_sutunu_bul(df_ders, gun, saat)
@@ -639,7 +657,11 @@ with tab1:
             secilen_mazeret = st.selectbox("Mazeret", ["Raporlu", "Görevli izinli", "İzinli", "Sevkli"])
             secilen_gelmeyen_saatler = st.multiselect("Gelmeyen Ders Saatleri", options=list(range(1, 9)),
                                                       default=list(range(1, 9)))
-            form_brans_onceligi = st.checkbox("🔍 Branş Önceliği Uygula", value=True, key="form_brans_cb")
+
+            # NÖBET DIŞI VE BRANŞ SEÇENEKLERİ EKLENDİ
+            form_sadece_nobet = st.checkbox("⭐ Sadece Nöbetçi Öğretmenlerden Seç (Nöbet Dışı Bırak)", value=True,
+                                            help="İşaretlenirse sadece o gün nöbetçi olan öğretmenler görevlendirilir.")
+            form_brans_onceligi = st.checkbox("🔍 Branş Önceliği Uygula", value=True)
 
             if st.form_submit_button("🚀 Kaydet ve Otomatik Görevlendir", type="primary", use_container_width=True):
                 if secilen_anlik_ogretmen in ["Lütfen Öğretmen Seçin...", "Tüm Öğretmenler"]:
@@ -655,15 +677,14 @@ with tab1:
                         st.warning("⚠️ Bu öğretmen bugün zaten gelmeyenler listesine eklenmiş!")
                     else:
                         saatler_str = ",".join(map(str, secilen_gelmeyen_saatler))
-                        yeni = pd.DataFrame(
-                            {"Tarih": [str(t1_tarih)], "Gün": [secilen_gun], "Öğretmen Adı": [secilen_anlik_ogretmen],
-                             "Gelmeyen Saatler": [saatler_str], "Mazeret": [secilen_mazeret], "Onaylandi": [False]})
+                        yeni = pd.DataFrame({
+                            "Tarih": [str(t1_tarih)], "Gün": [secilen_gun], "Öğretmen Adı": [secilen_anlik_ogretmen],
+                            "Gelmeyen Saatler": [saatler_str], "Mazeret": [secilen_mazeret], "Onaylandi": [False],
+                            "SadeceNobet": [form_sadece_nobet], "BransOnceligi": [form_brans_onceligi]
+                        })
                         mevcut = pd.concat([mevcut, yeni], ignore_index=True)
                         st.session_state.gelmeyen_listesi = mevcut
                         gelmeyenleri_kaydet(mevcut)
-
-                        yeni_idx = mevcut.index[-1]
-                        st.session_state[f"brans_cb_{yeni_idx}"] = form_brans_onceligi
 
                         otomatik_gorevlendirmeleri_guncelle(t1_tarih, secilen_gun)
                         st.success("✅ Kayıt başarıyla eklendi ve otomatik görevlendirildi!")
@@ -1256,8 +1277,8 @@ with tab8:
                         gelmeyenleri_kaydet(df_g)
                         st.session_state.gelmeyen_listesi = df_g
 
-                    if "nobetler" in icerik_json:
-                        df_n = pd.DataFrame(icerik_json["nobetler"])
+                    if "nobetçi" in icerik_json or "nobetler" in icerik_json:
+                        df_n = pd.DataFrame(icerik_json.get("nobetler", icerik_json.get("nobetçi", [])))
                         nobetleri_kaydet(df_n)
                         st.session_state.nobet_listesi = df_n
 
