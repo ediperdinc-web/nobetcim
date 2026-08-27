@@ -1197,6 +1197,15 @@ with tab8:
         st.markdown("#### 📥 1. Sistem Yedeğini İndir")
         st.write("Verilerinizin güncel bir kopyasını bilgisayarınıza kaydedin.")
 
+        # Ders programı Excel tablosunu da JSON yedeğinin içine dahil edelim
+        ders_prog_records = []
+        if os.path.exists(dosya_adi):
+            try:
+                df_temp_excel = pd.read_excel(dosya_adi, dtype=str)
+                ders_prog_records = df_temp_excel.to_dict(orient="records")
+            except:
+                pass
+
         yedek_paketi = {
             "aktif_kullanici": aktif_kullanici,
             "tarih": str(datetime.datetime.now()),
@@ -1204,7 +1213,8 @@ with tab8:
             "muafiyetler": muafiyetleri_yukle(),
             "gelmeyenler": gelmeyenleri_yukle().to_dict(orient="records"),
             "nobetler": nobetleri_yukle().to_dict(orient="records"),
-            "gecmis": gecmisi_yukle().to_dict(orient="records")
+            "gecmis": gecmisi_yukle().to_dict(orient="records"),
+            "ders_programi": ders_prog_records
         }
 
         json_yedek_str = json.dumps(yedek_paketi, ensure_ascii=False, indent=4)
@@ -1216,16 +1226,6 @@ with tab8:
             mime="application/json",
             use_container_width=True
         )
-
-        if os.path.exists(dosya_adi):
-            with open(dosya_adi, "rb") as f:
-                st.download_button(
-                    "📊 Ders Programı Excel Dosyasını İndir",
-                    data=f,
-                    file_name=dosya_adi,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
-                )
 
     with col_yedek2:
         st.markdown("#### 📤 2. Yedekten Geri Yükle (Kurtar)")
@@ -1257,8 +1257,12 @@ with tab8:
                         gecmisi_kaydet(df_h)
                         st.session_state.assignment_history = df_h
 
+                    if "ders_programi" in icerik_json and icerik_json["ders_programi"]:
+                        df_dp = pd.DataFrame(icerik_json["ders_programi"])
+                        df_dp.to_excel(dosya_adi, index=False)
+
                     st.success(
-                        "🎉 İŞLEM BAŞARILI: Yedek dosyası başarıyla yüklendi ve tüm sistem verileriniz güncellendi!")
+                        "🎉 İŞLEM BAŞARILI: Yedek dosyası başarıyla yüklendi, ders programınız ve tüm sistem verileriniz eski haline getirildi!")
                     st.balloons()
                 except Exception as e:
                     st.error(f"❌ Yedek yüklenirken hata oluştu: {e}")
