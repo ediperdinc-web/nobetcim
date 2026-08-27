@@ -209,6 +209,20 @@ if not st.session_state.logged_in:
     st.title("🏫 Nöbetçim - Okul Nöbet ve Görevlendirme Sistemi")
     st.info(
         "👋 Hoş geldiniz! Devam etmek için lütfen sol taraftaki panelden giriş yapın veya hemen ücretsiz kayıt olun.")
+
+    st.markdown("---")
+    st.markdown("### 🚀 Nöbetçim Sistemi ile Neler Yapabilirsiniz?")
+    st.markdown("""
+    Bu sistem okullardaki nöbet ve ders görevlendirme süreçlerini tamamen dijitalleştirmek ve hızlandırmak için tasarlanmıştır. 
+
+    * **📋 Ders Programı Entegrasyonu:** Okulunuza ait ders programı Excel veya PDF dosyasını yükleyerek tüm öğretmenlerin programını dijital ortamda görüntüleyin.
+    * **⚡ Otomatik Acil Görevlendirme:** Günlük olarak gelmeyen/izinli öğretmenlerin ders saatlerine, nöbetçi öğretmenler arasından en adil ve otomatik şekilde görevlendirme yapın.
+    * **📅 Günlük Nöbetçi Listesi:** Hangi gün kimin hangi katta/yerde nöbetçi olduğunu belirleyin ve bu listeyi günlük olarak tek tıkla çıktı alın.
+    * **📄 Tebligat ve Görev Raporlama:** Günlük görevlendirmeleri onaylayarak resmi tebligat ve imza listesi çıktısını (HTML formatında) alın.
+    * **🛡️ Muafiyet ve Nöbet Yönetimi:** Öğretmenlerin nöbet veya görev muafiyet durumlarını toplu olarak düzenleyip takip edin.
+    * **📊 Toplam Görev Takibi:** Eğitim öğretim yılı boyunca veya aylık bazda kimin kaç kez görev aldığını şeffaf bir şekilde raporlayın.
+    * **💾 Günlük Yedekleme ve Kurtarma:** Tüm verilerinizi tek tıkla yedekleyin, olası bir durumda verilerinizi anında geri yükleyin.
+    """)
     st.stop()
 
 aktif_kullanici = st.session_state.current_user
@@ -733,7 +747,6 @@ with tab1:
                         atanan_kisi = "-"
                         if not match_atama.empty:
                             ham_atanan = str(match_atama["Görevlendirilen Öğretmen"].values[0])
-                            # Nöbetçi kontrolü ekleyerek yıldız ekleyelim
                             if tr_normalize(ham_atanan) in nobetci_isimleri_clean:
                                 atanan_kisi = f"⭐ {ham_atanan}"
                             else:
@@ -761,11 +774,11 @@ with tab1:
                                     musait_adaylar = uygun_ogretmenleri_bul(df_ders, t1_tarih, secilen_gun, saat,
                                                                             g_ogrt, "", False, sadece_nobetci=False)
 
-                                    # Akıllı Başlık: Atama yapılmışsa "Görevliyi Değiştir", yapılmamışsa "Görevli Ata"
+                                    # Akıllı Başlık: Atama yapılmışsa "Görevliyi Değiştir", yapılmamışsa "Atama Yapılmadı / Görevli Ekle"
                                     if not match_atama.empty:
                                         ilk_secenek_metni = "Görevliyi Değiştir / Seçim Yap"
                                     else:
-                                        ilk_secenek_metni = "Görevli Ata / Seçim Yap"
+                                        ilk_secenek_metni = "Atama Yapılmadı / Görevli Ekle"
 
                                     secenekler = [ilk_secenek_metni]
                                     aday_map = {}
