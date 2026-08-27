@@ -985,15 +985,13 @@ with tab5:
 # --- 6. SEKME: EXCEL & VERİ YÖNETİMİ (PDF DESTEKLİ) ---
 with tab6:
     st.subheader("📁 Ders Programı Yükleme (Excel veya PDF)")
-    st.write(
-        "Okulunuza ait ders programı dosyasını ister Excel (.xlsx) ister MEB/e-Okul çıkışlı PDF formatında yükleyebilirsiniz.")
+    st.write("Okulunuza ait ders programı dosyasını ister Excel (.xlsx) ister MEB/e-Okul çıkışlı PDF formatında yükleyebilirsiniz.")
 
     yuklenen_dosya = st.file_uploader("Dosya Seç (Excel veya PDF)", type=["xlsx", "xls", "pdf"])
     if yuklenen_dosya:
         dosya_uzantisi = yuklenen_dosya.name.split(".")[-1].lower()
         if dosya_uzantisi in ["xlsx", "xls"]:
-            with open(dosya_adi, "wb") as f:
-                f.write(yuklenen_dosya.getbuffer())
+            with open(dosya_adi, "wb") as f: f.write(yuklenen_dosya.getbuffer())
             st.success("✅ Excel ders programı başarıyla yüklendi!")
             st.rerun()
         elif dosya_uzantisi == "pdf":
@@ -1005,7 +1003,17 @@ with tab6:
                         if tablo:
                             tum_satirlar.extend(tablo)
                 if tum_satirlar:
-                    df_pdf = pd.DataFrame(tum_satirlar[1:], columns=tum_satirlar[0] if len(tum_satirlar) > 0 else None)
+                    # Sütun ve veri uyuşmazlığını önlemek için dinamik kolon oluşturma
+                    max_len = max(len(satir) for satir in tum_satirlar)
+                    basliklar = [f"Kolon_{i}" for i in range(max_len)]
+
+                    temiz_satirlar = []
+                    for satir in tum_satirlar:
+                        while len(satir) < max_len:
+                            satir.append("")
+                        temiz_satirlar.append(satir)
+
+                    df_pdf = pd.DataFrame(temiz_satirlar[1:], columns=basliklar)
                     df_pdf.to_excel(dosya_adi, index=False)
                     st.success("✅ PDF ders programı başarıyla okundu ve Excel formatına dönüştürüldü!")
                     st.rerun()
