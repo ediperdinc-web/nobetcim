@@ -1009,7 +1009,33 @@ with tab4:
 
 # --- 5. SEKME: ÖĞRETMEN DERS PROGRAMLARI ---
 with tab5:
-    st.subheader("📚 Öğretmen Ders Programları ve Manuel Düzenleme")
+    st.subheader("📚 Öğretmen Ders Programları, Branş, Ekleme ve Silme Yönetimi")
+
+    # Yeni Öğretmen Ekleme Alanı
+    with st.expander("➕ Yeni Öğretmen Ekle"):
+        with st.form("yeni_ogretmen_ekle_form"):
+            yeni_ogr_ad = st.text_input("Öğretmen Adı Soyadı")
+            yeni_ogr_brans = st.text_input("Öğretmen Branşı")
+            if st.form_submit_button("Öğretmeni Sisteme Ekle", type="primary", use_container_width=True):
+                if not yeni_ogr_ad.strip():
+                    st.warning("Lütfen öğretmen adı soyadı girin.")
+                else:
+                    var_mi = not ogretmen_satiri_bul(df_ders, yeni_ogr_ad, ogrt_col).empty
+                    if var_mi:
+                        st.warning("⚠️ Bu isimde bir öğretmen zaten kayıtlı!")
+                    else:
+                        yeni_satir_dict = {c: "" for c in df_ders.columns}
+                        if ogrt_col in df_ders.columns: yeni_satir_dict[ogrt_col] = yeni_ogr_ad.strip()
+                        if brans_col in df_ders.columns: yeni_satir_dict[brans_col] = yeni_ogr_brans.strip()
+                        if "Sıra No" in df_ders.columns: yeni_satir_dict["Sıra No"] = str(len(df_ders) + 1)
+
+                        df_yeni_eklenen = pd.DataFrame([yeni_satir_dict])
+                        df_ders = pd.concat([df_ders, df_yeni_eklenen], ignore_index=True)
+                        df_ders.to_excel(dosya_adi, index=False)
+                        st.success(f"✅ {yeni_ogr_ad} başarıyla eklendi ve kaydedildi!")
+                        st.rerun()
+
+    st.markdown("---")
     col_g1, col_g2 = st.columns(2)
     with col_g1:
         secilen_goruntu_ogrt = st.selectbox("Öğretmen Seçin", options=ogretmenler_listesi, key="goruntu_ogrt_secim")
@@ -1045,7 +1071,9 @@ with tab5:
         ogrt_satir_df = ogretmen_satiri_bul(df_ders, secilen_goruntu_ogrt, ogrt_col)
         if not ogrt_satir_df.empty:
             idx_orig = ogrt_satir_df.index[0]
-            mevcut_brans = str(ogrt_satir_df[brans_col].values[0]) if brans_col in ogrt_satir_df.columns else ""
+            mevcut_brans = str(
+                ogrt_satir_df[brans_col].values[0]) if brans_col in ogrt_satir_df.columns and not pd.isna(
+                ogrt_satir_df[brans_col].values[0]) else ""
 
             st.markdown(f"##### 👁️ Program Önizlemesi")
             if secilen_goruntu_gun == "Tüm Günler":
@@ -1074,39 +1102,53 @@ with tab5:
             st.dataframe(onizleme_df.style.map(stil_uygula), use_container_width=True, hide_index=True)
 
             st.markdown("---")
-            st.markdown(f"##### ✍️ Manuel Düzenleme Paneli: {secilen_goruntu_ogrt}")
-            yeni_brans_input = st.text_input("Öğretmen Branşı", value=mevcut_brans, key=f"brans_input_{idx_orig}")
+            st.markdown(f"##### ✍️ Manuel Düzenleme ve Silme Paneli: {secilen_goruntu_ogrt}")
 
-            D_cols_to_edit = [c for c in gosterilecek_sutunlar if c in ogrt_satir_df.columns]
-            alt_df = ogrt_satir_df[D_cols_to_edit].copy()
+            with st.form(f"ogretmen_duzenle_form_{idx_orig}"):
+                yeni_brans_input = st.text_input("Öğretmen Branşı", value=mevcut_brans)
 
-            cols_seen = set()
-            new_cols = []
-            for c in alt_df.columns:
-                col_name = str(c)
-                if col_name in cols_seen:
-                    i = 1
-                    while f"{col_name}_{i}" in cols_seen: i += 1
-                    col_name = f"{col_name}_{i}"
-                cols_seen.add(col_name)
-                new_cols.append(col_name)
-            alt_df.columns = new_cols
+                D_cols_to_edit = [c for c in gosterilecek_sutunlar if c in ogrt_satir_df.columns]
+                alt_df = ogrt_satir_df[D_cols_to_edit].copy()
 
-            edited_ogrt_df = st.data_editor(alt_df, hide_index=True, use_container_width=True,
-                                            key=f"editor_ogrt_{idx_orig}")
+                cols_seen = set()
+                new_cols = []
+                for c in alt_df.columns:
+                    col_name = str(c)
+                    if col_name in cols_seen:
+                        i = 1
+                        while f"{col_name}_{i}" in cols_seen: i += 1
+                        col_name = f"{col_name}_{i}"
+                    cols_seen.add(col_name)
+                    new_cols.append(col_name)
+                alt_df.columns = new_cols
 
-            if st.button("💾 Değişiklikleri ve Branşı Kaydet", type="primary", use_container_width=True):
-                if brans_col in df_ders.columns:
-                    df_ders.loc[idx_orig, brans_col] = yeni_brans_input
+                edited_ogrt_df = st.data_editor(alt_df, hide_index=True, use_container_width=True)
 
-                for orig_col, edited_col in zip(D_cols_to_edit, alt_df.columns):
-                    if edited_col in edited_ogrt_df.columns:
-                        yeni_val = str(edited_ogrt_df[edited_col].values[0])
-                        df_ders.loc[idx_orig, orig_col] = yeni_val
+                c_kaydet, c_sil_ogr = st.columns(2)
+                with c_kaydet:
+                    submitted_kaydet = st.form_submit_button("💾 Değişiklikleri ve Branşı Kaydet", type="primary",
+                                                             use_container_width=True)
+                with c_sil_ogr:
+                    submitted_sil = st.form_submit_button("🗑️ Öğretmeni Sistemden Sil", use_container_width=True)
 
-                df_ders.to_excel(dosya_adi, index=False)
-                st.success("✅ Öğretmen ders programı ve branş bilgisi başarıyla güncellendi ve kaydedildi!")
-                st.rerun()
+                if submitted_kaydet:
+                    if brans_col in df_ders.columns:
+                        df_ders.loc[idx_orig, brans_col] = yeni_brans_input
+
+                    for orig_col, edited_col in zip(D_cols_to_edit, alt_df.columns):
+                        if edited_col in edited_ogrt_df.columns:
+                            yeni_val = str(edited_ogrt_df[edited_col].values[0])
+                            df_ders.loc[idx_orig, orig_col] = yeni_val
+
+                    df_ders.to_excel(dosya_adi, index=False)
+                    st.success("✅ Öğretmen ders programı ve branş bilgisi başarıyla güncellendi ve kaydedildi!")
+                    st.rerun()
+
+                if submitted_sil:
+                    df_ders = df_ders.drop(idx_orig).reset_index(drop=True)
+                    df_ders.to_excel(dosya_adi, index=False)
+                    st.success(f"✅ {secilen_goruntu_ogrt} sistemden silindi ve kaydedildi!")
+                    st.rerun()
     else:
         st.info("Lütfen bir öğretmen seçin.")
 
@@ -1215,8 +1257,9 @@ with tab8:
                         gecmisi_kaydet(df_h)
                         st.session_state.assignment_history = df_h
 
-                    st.success("✅ Yedek başarıyla geri yüklendi! Verileriniz güncellendi.")
-                    st.rerun()
+                    st.success(
+                        "🎉 İŞLEM BAŞARILI: Yedek dosyası başarıyla yüklendi ve tüm sistem verileriniz güncellendi!")
+                    st.balloons()
                 except Exception as e:
                     st.error(f"❌ Yedek yüklenirken hata oluştu: {e}")
 
